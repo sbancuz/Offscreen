@@ -1,5 +1,7 @@
 package com.sbancuz.offscreen;
 
+import com.sbancuz.offscreen.core.Driver;
+import com.sbancuz.offscreen.window.Window;
 import net.minecraft.client.settings.KeyBinding;
 
 import org.lwjgl.input.Keyboard;
@@ -26,18 +28,31 @@ public class ClientProxy extends CommonProxy {
         FMLCommonHandler.instance()
             .bus()
             .register(this);
+
+        FMLCommonHandler.instance()
+            .bus()
+            .register(Driver.INSTANCE);
     }
+
+    private Window w;
 
     @SubscribeEvent
     public void onKeyInput(final InputEvent.KeyInputEvent event) {
         if (debugToggleScreen.isPressed()) {
-//            if (WindowRegistry.INSTANCE.hasWindow()) {
-//                Offscreen.LOG.info("[offscreen] M pressed: closing offscreen window");
-//                WindowRegistry.INSTANCE.shutdown();
-//            } else {
-//                Offscreen.LOG.info("[offscreen] M pressed: opening offscreen vanilla screen");
-//                OffscreenApi.open(new TestVanillaScreen());
-//            }
+            if (w == null || !w.isOpen()) {
+                Offscreen.LOG.info("[offscreen] M pressed: opening offscreen vanilla screen");
+                w = new Window("test");
+            } else {
+                Offscreen.LOG.info("[offscreen] M pressed: closing offscreen window");
+                w.destroy();
+            }
+
+            // if (WindowRegistry.INSTANCE.hasWindow()) {
+            // WindowRegistry.INSTANCE.shutdown();
+            // } else {
+            // Offscreen.LOG.info("[offscreen] M pressed: opening offscreen vanilla screen");
+            // OffscreenApi.open(new TestVanillaScreen());
+            // }
         }
     }
 }
