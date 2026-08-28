@@ -1,7 +1,9 @@
 package com.sbancuz.offscreen.window;
 
-import com.sbancuz.offscreen.Offscreen;
+import java.nio.ByteBuffer;
+
 import net.minecraft.client.Minecraft;
+
 import org.lwjgl.opengl.EXTFramebufferObject;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
@@ -15,7 +17,7 @@ import org.lwjgl.sdl.SDLSurface;
 import org.lwjgl.sdl.SDL_Surface;
 import org.lwjgl.system.MemoryUtil;
 
-import java.nio.ByteBuffer;
+import com.sbancuz.offscreen.Offscreen;
 
 public final class Renderer {
 
@@ -39,8 +41,10 @@ public final class Renderer {
     private int fillSlot;
     /** Slot of the most recent readback kick (this frame's data, still possibly in flight). */
     private int lastFilledSlot = -1;
-    /** Slot holding the PREVIOUS frame's finished pixels; presented with one frame of lag so
-     * the GPU->CPU copy overlaps the next frame's game rendering instead of stalling it. */
+    /**
+     * Slot holding the PREVIOUS frame's finished pixels; presented with one frame of lag so
+     * the GPU->CPU copy overlaps the next frame's game rendering instead of stalling it.
+     */
     private int prevFilledSlot = -1;
 
     /** Currently mapped PBO slot during collectReady()/present(), -1 when none. */
@@ -158,11 +162,7 @@ public final class Renderer {
         if (!waitForFence(slot)) return;
         GL15.glBindBuffer(GL21.GL_PIXEL_PACK_BUFFER, pbos[slot]);
         final long size = (long) slotWidths[slot] * slotHeights[slot] * 4L;
-        final ByteBuffer pix = GL30.glMapBufferRange(
-            GL21.GL_PIXEL_PACK_BUFFER,
-            0,
-            size,
-            GL30.GL_MAP_READ_BIT);
+        final ByteBuffer pix = GL30.glMapBufferRange(GL21.GL_PIXEL_PACK_BUFFER, 0, size, GL30.GL_MAP_READ_BIT);
         GL15.glBindBuffer(GL21.GL_PIXEL_PACK_BUFFER, 0);
         presentingSlot = slot;
         mappedPixels = pix;

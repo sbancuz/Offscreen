@@ -1,10 +1,13 @@
 package com.sbancuz.offscreen;
 
-import com.sbancuz.offscreen.core.Driver;
-import com.sbancuz.offscreen.window.Window;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.inventory.GuiInventory;
 import net.minecraft.client.settings.KeyBinding;
 
 import org.lwjgl.input.Keyboard;
+
+import com.sbancuz.offscreen.api.OffscreenAPI;
+import com.sbancuz.offscreen.core.Driver;
 
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -34,19 +37,20 @@ public class ClientProxy extends CommonProxy {
             .register(Driver.INSTANCE);
     }
 
-    private Window w;
-
     @SubscribeEvent
     public void onKeyInput(final InputEvent.KeyInputEvent event) {
         if (debugToggleScreen.isPressed()) {
-            if (w == null || !w.isOpen()) {
-                Offscreen.LOG.info("[offscreen] M pressed: opening offscreen vanilla screen");
-                w = new Window("test");
-            } else {
-                Offscreen.LOG.info("[offscreen] M pressed: closing offscreen window");
-                w.destroy();
-            }
+            // if (w == null || !w.isOpen()) {
+            // Offscreen.LOG.info("[offscreen] M pressed: opening offscreen vanilla screen");
+            // w = new Window("test");
+            // } else {
+            // Offscreen.LOG.info("[offscreen] M pressed: closing offscreen window");
+            // w.destroy();
+            // }
 
+            Minecraft mc = Minecraft.getMinecraft();
+            if (mc.theWorld == null || mc.thePlayer == null) return; // in menu
+            OffscreenAPI.open(new GuiInventory(Minecraft.getMinecraft().thePlayer));
             // if (WindowRegistry.INSTANCE.hasWindow()) {
             // WindowRegistry.INSTANCE.shutdown();
             // } else {

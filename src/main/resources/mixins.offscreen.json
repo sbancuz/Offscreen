@@ -1,8 +1,10 @@
 {
-    "required": true,
-    "package": "com.sbancuz.offscreen.mixins",
-    "refmap": "mixins.offscreen.refmap.json",
-    "compatibilityLevel": "JAVA_8",
-    "client": [
-    ]
+  "required": true,
+  "package": "com.sbancuz.offscreen.mixins",
+  "refmap": "mixins.offscreen.refmap.json",
+  "compatibilityLevel": "JAVA_8",
+  "client": [
+    "GuiScreenBackground",
+    "MinecraftAccessor"
+  ]
 }

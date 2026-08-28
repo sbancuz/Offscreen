@@ -1,11 +1,12 @@
 package com.sbancuz.offscreen.core;
 
+import java.util.List;
+
 import com.sbancuz.offscreen.window.Window;
+
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-
-import java.util.List;
 
 public class Driver {
 
@@ -24,11 +25,9 @@ public class Driver {
     @SubscribeEvent
     public void onClientTick(final TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-//        try {
-//            SecondScreenManager.tickHostedScreen();
-//        } catch (final Throwable t) {
-//            PlanNH.LOG.error("[secondscreen] tick dispatch failed", t);
-//        }
+        for (final Window w : windows) {
+            w.update();
+        }
     }
 
     public void trackWindow(final Window window) {
