@@ -1,13 +1,13 @@
 package com.sbancuz.offscreen.api;
 
+import java.util.function.Supplier;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.inventory.GuiInventory;
 
 import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
 import com.sbancuz.offscreen.window.Window;
-import net.minecraft.client.gui.inventory.GuiInventory;
-
-import java.util.function.Supplier;
 
 public final class OffscreenAPI {
 

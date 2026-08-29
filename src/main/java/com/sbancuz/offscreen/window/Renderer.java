@@ -5,13 +5,11 @@ import java.nio.ByteBuffer;
 import net.minecraft.client.Minecraft;
 
 import org.lwjgl.opengl.EXTFramebufferObject;
-import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL30C;
 import org.lwjgl.opengl.GL32C;
-import org.lwjgl.sdl.SDLVideo;
 
 import com.sbancuz.offscreen.Offscreen;
 
@@ -89,10 +87,8 @@ public final class Renderer {
         final int dw = Math.max(pixelWidth, 1);
         final int dh = Math.max(pixelHeight, 1);
         GL11.glViewport(0, 0, dw, dh);
-        GL32C.glBlitFramebuffer(
-            0, 0, bufferWidth, bufferHeight,
-            0, 0, dw, dh,
-            GL11.GL_COLOR_BUFFER_BIT, GL11.GL_LINEAR);
+        GL32C
+            .glBlitFramebuffer(0, 0, bufferWidth, bufferHeight, 0, 0, dw, dh, GL11.GL_COLOR_BUFFER_BIT, GL11.GL_LINEAR);
         int err = GL11.glGetError();
         if (err != GL11.GL_NO_ERROR) {
             Offscreen.LOG.warn(

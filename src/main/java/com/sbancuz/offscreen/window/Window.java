@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 
-import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 
@@ -12,6 +11,8 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.sdl.SDLError;
 import org.lwjgl.sdl.SDLInit;
 import org.lwjgl.sdl.SDLVideo;
+import org.lwjglx.opengl.Display;
+import org.lwjglx.opengl.DrawableGL;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
@@ -20,8 +21,6 @@ import com.sbancuz.offscreen.mixins.MinecraftAccessor;
 
 import lombok.Getter;
 import lombok.SneakyThrows;
-import org.lwjglx.opengl.Display;
-import org.lwjglx.opengl.DrawableGL;
 
 public final class Window {
 
@@ -37,6 +36,7 @@ public final class Window {
     private final String title;
 
     private final Renderer renderer = new Renderer();
+    private final HostedStack screenStack = new HostedStack();
 
     private int pixelWidth = DEFAULT_WIDTH;
     private int pixelHeight = DEFAULT_HEIGHT;
@@ -44,7 +44,12 @@ public final class Window {
     private int guiWidth = 0;
     private int guiHeight = 0;
 
-    private final HostedStack screenStack = new HostedStack();
+    // TODO: InputRouter
+    //  1. SDL_SetEventFilter to capture events before lwjgl3ify's shared queue
+    //  2. Private ring buffer (256 entries, drop oldest on overflow)
+    //  3. Keyboard.sdlKeyPressedArray shadow swap on focus gain/loss
+    //  4. Per-frame drain(): translate coords/keycodes, accumulate TEXT_INPUT
+    //  5. Dispatch via screenStack.runScoped()
 
     public Window(final String title) {
         this.title = title;
@@ -59,7 +64,8 @@ public final class Window {
             if (!(Display.getDrawable() instanceof DrawableGL drawable)) {
                 Offscreen.LOG.error(
                     "[secondscreen] unexpected drawable type {}",
-                    Display.getDrawable().getClass());
+                    Display.getDrawable()
+                        .getClass());
                 return;
             }
             sharedContext = drawable.createSharedContext().sdlContext;
@@ -118,7 +124,8 @@ public final class Window {
 
     @SneakyThrows
     static void restoreMcContext() {
-        Display.getDrawable().makeCurrent();
+        Display.getDrawable()
+            .makeCurrent();
         GL.createCapabilities();
     }
 
@@ -143,16 +150,17 @@ public final class Window {
         if (!renderer.ensureCorrectSize(pixelWidth, pixelHeight)) return;
         if (screenStack.isEmpty()) return;
 
-        final HostedScreen<?> screen = screenStack.top();
-        if (screen.needsResize(guiWidth, guiHeight)) {
-            screen.resize(pixelWidth, pixelHeight, guiWidth, guiHeight);
-        }
-
         renderer.beginFrame(pixelWidth, pixelHeight, guiWidth, guiHeight);
         try {
             final long now = System.currentTimeMillis();
             final float partialTicks = ((MinecraftAccessor) mc).getTimer().renderPartialTicks;
-            screen.draw(mc, partialTicks, now);
+            final HostedScreen<?> screen = screenStack.top();
+
+            if (screen.needsResize(guiWidth, guiHeight)) {
+                screen.resize(pixelWidth, pixelHeight, guiWidth, guiHeight);
+            }
+
+            screenStack.runScoped(() -> screen.draw(mc, partialTicks, now));
         } finally {
             renderer.endFrame(mc);
         }
@@ -195,6 +203,7 @@ public final class Window {
 
     public void update() {
         if (screenStack.isEmpty()) return;
-        screenStack.top().runWith(HostUI::update);
+        screenStack.top()
+            .runWith(HostUI::update);
     }
 }

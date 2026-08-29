@@ -1,18 +1,34 @@
 package com.sbancuz.offscreen.integration.vanilla;
 
-import com.sbancuz.offscreen.mixins.GuiContainerAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.inventory.GuiContainer;
 
 import com.sbancuz.offscreen.api.HostUI;
-import net.minecraft.client.gui.inventory.GuiContainer;
+import com.sbancuz.offscreen.integration.nei.NeiScope;
+import com.sbancuz.offscreen.mixins.GuiContainerAccessor;
+import com.sbancuz.offscreen.scope.FocusScope;
+import com.sbancuz.offscreen.scope.Scope;
+import com.sbancuz.offscreen.scope.ScopePipeline;
+import com.sbancuz.offscreen.scope.ScreenScope;
 
 public class VanillaUI implements HostUI {
 
     private final GuiScreen screen;
+    private final Scope scope;
 
     public VanillaUI(GuiScreen screen) {
         this.screen = screen;
+        this.scope = ScopePipeline.builder()
+            .always(new FocusScope())
+            .always(new ScreenScope(this::getGuiScreen))
+            .ifModLoaded("NotEnoughItems", NeiScope::new)
+            .build();
+    }
+
+    @Override
+    public Scope scope() {
+        return scope;
     }
 
     @Override

@@ -1,25 +1,20 @@
 package com.sbancuz.offscreen.integration.nei;
 
-import com.sbancuz.offscreen.api.ActionScope;
+import com.sbancuz.offscreen.scope.Scope;
 
-import codechicken.nei.NEIController;
-import codechicken.nei.guihook.GuiContainerManager;
+public final class NeiScope implements Scope {
 
-public final class NeiScope implements ActionScope {
-
-    private boolean saved = false;
-    private GuiContainerManager manager;
+    private Object savedManager;
 
     @Override
-    public void save() {
-        manager = NEIController.manager;
-        saved = true;
+    public void enter() {
+        savedManager = codechicken.nei.NEIController.manager;
     }
 
     @Override
     public void restore() {
-        if (!saved) return;
-
-        NEIController.manager = manager;
+        codechicken.nei.NEIController.manager =
+            (codechicken.nei.guihook.GuiContainerManager) savedManager;
+        savedManager = null;
     }
 }

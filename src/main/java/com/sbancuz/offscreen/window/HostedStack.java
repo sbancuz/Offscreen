@@ -1,22 +1,84 @@
 package com.sbancuz.offscreen.window;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiScreen;
+
+import com.sbancuz.offscreen.Offscreen;
+import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
+
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
 
-    // private HostedEntry findEntry(final GuiScreen s) {
-    // if (s == null) return null;
-    // for (final HostedEntry e : hostedStack) {
-    // if (e.wrapper == s) return e;
-    // }
-    // return null;
-    // }
+    public HostedScreen<?> findEntry(final GuiScreen screen) {
+        if (screen == null) return null;
+        for (HostedScreen<?> hostedScreen : this) {
+            if (hostedScreen.getGuiScreen() == screen) return hostedScreen;
+        }
+        return null;
+    }
 
-    /** Pops entries until {@code target} is on top. Never pops the target or the base entry. */
-    private void popTo(final HostedScreen<?> target) {
+    public void popTo(final HostedScreen<?> target) {
         while (top() != target && size() > 1) {
             pop().dispose();
         }
+    }
+
+    public void runScoped(final Runnable action) {
+        final HostedScreen<?> screen = top();
+        final GuiScreen savedScreen = Minecraft.getMinecraft().currentScreen;
+        boolean poisoned = false;
+        screen.scope().enter();
+
+        try {
+            action.run();
+        } catch (final Throwable t) {
+            poisoned = true;
+            Offscreen.LOG.error("[secondscreen] scoped action failed", t);
+        } finally {
+            if (!poisoned) {
+                try {
+                    handleScreenChange(savedScreen);
+                } catch (final Throwable t) {
+                    Offscreen.LOG.error("[secondscreen] screen-change handling failed", t);
+                }
+            }
+            screen.scope().restore();
+        }
+    }
+
+    private void handleScreenChange(final GuiScreen prevTop) {
+        final Minecraft mc = Minecraft.getMinecraft();
+        final GuiScreen now = mc.currentScreen;
+        if (now == prevTop) return;
+
+        final HostedScreen<?> match = findEntry(now);
+        if (match != null) {
+            popTo(match);
+            match.requestResize();
+            return;
+        }
+
+        if (now == null) {
+            if (size() > 1) {
+                final HostedScreen<?> t = pop();
+                Offscreen.LOG.info("[secondscreen] pop {} (close-to-null, depth {})", t, size());
+                t.dispose();
+                top().requestResize();
+            }
+            mc.currentScreen = top().getGuiScreen();
+            return;
+        }
+
+        pushStolen(now);
+    }
+
+    public void pushStolen(final GuiScreen stolen) {
+        final HostedScreen<?> entry = new HostedScreen<>(new VanillaUI(stolen));
+        entry.requestResize();
+        push(entry);
+        Offscreen.LOG.info("[secondscreen] STEAL {} (depth {})",
+            stolen.getClass().getSimpleName(), size());
     }
 
 }
