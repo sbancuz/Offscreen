@@ -1,5 +1,10 @@
 package com.sbancuz.offscreen.window;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.IntBuffer;
+
+import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 
@@ -7,8 +12,6 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.sdl.SDLError;
 import org.lwjgl.sdl.SDLInit;
 import org.lwjgl.sdl.SDLVideo;
-import org.lwjgl.sdl.SDL_Surface;
-import org.lwjglx.opengl.Display;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
@@ -17,6 +20,8 @@ import com.sbancuz.offscreen.mixins.MinecraftAccessor;
 
 import lombok.Getter;
 import lombok.SneakyThrows;
+import org.lwjglx.opengl.Display;
+import org.lwjglx.opengl.DrawableGL;
 
 public final class Window {
 
@@ -26,11 +31,15 @@ public final class Window {
     @Getter
     private volatile int id;
     private long sdlPtr;
+    private long sharedContext;
 
     @Getter
     private final String title;
 
     private final Renderer renderer = new Renderer();
+
+    private int pixelWidth = DEFAULT_WIDTH;
+    private int pixelHeight = DEFAULT_HEIGHT;
 
     private int guiWidth = 0;
     private int guiHeight = 0;
@@ -45,21 +54,48 @@ public final class Window {
             return;
         }
 
+        Display.glContextMutex.lock();
+        try {
+            if (!(Display.getDrawable() instanceof DrawableGL drawable)) {
+                Offscreen.LOG.error(
+                    "[secondscreen] unexpected drawable type {}",
+                    Display.getDrawable().getClass());
+                return;
+            }
+            sharedContext = drawable.createSharedContext().sdlContext;
+        } finally {
+            Display.glContextMutex.unlock();
+        }
+
+        restoreMcContext();
+
         sdlPtr = SDLVideo.SDL_CreateWindow(
             title,
             DEFAULT_WIDTH,
             DEFAULT_HEIGHT,
-            SDLVideo.SDL_WINDOW_RESIZABLE | SDLVideo.SDL_WINDOW_HIDDEN);
-
+            SDLVideo.SDL_WINDOW_OPENGL | SDLVideo.SDL_WINDOW_RESIZABLE | SDLVideo.SDL_WINDOW_HIDDEN);
         restoreMcContext();
+
         if (sdlPtr == 0L) {
             Offscreen.LOG.error("[secondscreen] SDL_CreateWindow failed: {}", sdlError());
             return;
         }
 
-        SDLVideo.SDL_ShowWindow(sdlPtr);
-        restoreMcContext();
         id = SDLVideo.SDL_GetWindowID(sdlPtr);
+
+        if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext)) {
+            Offscreen.LOG.error("[secondscreen] SDL_GL_MakeCurrent failed: {}", sdlError());
+            return;
+        }
+        SDLVideo.SDL_GL_SetSwapInterval(0);
+        restoreMcContext();
+
+        probeDrawableSize();
+
+        if (!SDLVideo.SDL_ShowWindow(sdlPtr)) {
+            Offscreen.LOG.warn("[secondscreen] SDL_ShowWindow failed: {}", sdlError());
+        }
+        restoreMcContext();
 
         Driver.INSTANCE.trackWindow(this);
     }
@@ -81,9 +117,8 @@ public final class Window {
     }
 
     @SneakyThrows
-    private static void restoreMcContext() {
-        Display.getDrawable()
-            .makeCurrent();
+    static void restoreMcContext() {
+        Display.getDrawable().makeCurrent();
         GL.createCapabilities();
     }
 
@@ -97,46 +132,60 @@ public final class Window {
     }
 
     private void renderFrame() {
-        // SDLEvents.SDL_PumpEvents();
-        final SDL_Surface surface = SDLVideo.SDL_GetWindowSurface(sdlPtr);
-        if (surface == null) return;
-
-        final int width = surface.w();
-        final int height = surface.h();
-
-        if (!renderer.ensureCorrectSize(width, height)) return;
+        probeDrawableSize();
 
         final Minecraft mc = Minecraft.getMinecraft();
 
-        final ScaledResolution resolution = new ScaledResolution(mc, width, height);
+        final ScaledResolution resolution = new ScaledResolution(mc, pixelWidth, pixelHeight);
         guiWidth = resolution.getScaledWidth();
         guiHeight = resolution.getScaledHeight();
 
-        renderer.beginFrame(width, height, guiWidth, guiHeight);
-        // Probably just for the integrations
-        // dispatchInputAndDraw(mc, now);
-        if (!screenStack.isEmpty()) {
-            final HostedScreen<?> screen = screenStack.top();
-            if (screen.needsResize(guiWidth, guiHeight)) {
-                screen.resize(guiWidth, guiHeight);
-            }
+        if (!renderer.ensureCorrectSize(pixelWidth, pixelHeight)) return;
+        if (screenStack.isEmpty()) return;
 
+        final HostedScreen<?> screen = screenStack.top();
+        if (screen.needsResize(guiWidth, guiHeight)) {
+            screen.resize(pixelWidth, pixelHeight, guiWidth, guiHeight);
+        }
+
+        renderer.beginFrame(pixelWidth, pixelHeight, guiWidth, guiHeight);
+        try {
             final long now = System.currentTimeMillis();
             final float partialTicks = ((MinecraftAccessor) mc).getTimer().renderPartialTicks;
-            // screen.handleInput()
             screen.draw(mc, partialTicks, now);
-            // TODO
+        } finally {
+            renderer.endFrame(mc);
         }
-        renderer.endFrame(mc, width, height);
 
-        renderer.collectReady();
-        if (!renderer.present(surface, width, height)) {
+        if (renderer.fbo() != 0) {
+            if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext)) {
+                Offscreen.LOG.error("[secondscreen] present MakeCurrent failed");
+                Window.restoreMcContext();
+                return;
+            }
+
+            renderer.present(pixelWidth, pixelHeight);
+
+            if (!SDLVideo.SDL_GL_SwapWindow(sdlPtr)) {
+                Offscreen.LOG.warn("[secondscreen] SDL_GL_SwapWindow failed");
+            }
+        }
+    }
+
+    private final IntBuffer wPtr = ByteBuffer.allocateDirect(4)
+        .order(ByteOrder.nativeOrder())
+        .asIntBuffer();
+    private final IntBuffer hPtr = ByteBuffer.allocateDirect(4)
+        .order(ByteOrder.nativeOrder())
+        .asIntBuffer();
+
+    private void probeDrawableSize() {
+        if (!SDLVideo.SDL_GetWindowSizeInPixels(sdlPtr, wPtr, hPtr)) {
             return;
         }
-
-        // SDLEvents.SDL_PumpEvents();
-        SDLVideo.SDL_UpdateWindowSurface(sdlPtr);
-        // SDLEvents.SDL_PumpEvents();
+        pixelWidth = wPtr.get(0);
+        pixelHeight = hPtr.get(0);
+        restoreMcContext();
     }
 
     public void setUI(HostUI ui) {

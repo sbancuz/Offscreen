@@ -32,13 +32,13 @@ public final class HostedScreen<T extends HostUI> {
         this.mc = Minecraft.getMinecraft();
     }
 
-    public void resize(final int width, final int height) {
-        this.width = width;
-        this.height = height;
+    public void resize(final int windowWidth, final int windowHeight, final int guiWidth, final int guiHeight) {
+        this.width = guiWidth;
+        this.height = guiHeight;
 
         runWith(
             s -> s.getGuiScreen()
-                .setWorldAndResolution(mc, width, height));
+                .setWorldAndResolution(mc, windowWidth, windowHeight));
         screen.onResize(width, height);
     }
 

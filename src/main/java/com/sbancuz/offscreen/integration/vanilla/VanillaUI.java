@@ -1,9 +1,11 @@
 package com.sbancuz.offscreen.integration.vanilla;
 
+import com.sbancuz.offscreen.mixins.GuiContainerAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 
 import com.sbancuz.offscreen.api.HostUI;
+import net.minecraft.client.gui.inventory.GuiContainer;
 
 public class VanillaUI implements HostUI {
 
@@ -26,6 +28,15 @@ public class VanillaUI implements HostUI {
     @Override
     public GuiScreen getGuiScreen() {
         return screen;
+    }
+
+    @Override
+    public void onResize(final int width, final int height) {
+        if (screen instanceof GuiContainer container) {
+            final GuiContainerAccessor accessor = (GuiContainerAccessor) container;
+            accessor.setGuiTop((height - accessor.getYSize()) / 2);
+            accessor.setGuiLeft((width - accessor.getXSize()) / 2);
+        }
     }
 
     @Override

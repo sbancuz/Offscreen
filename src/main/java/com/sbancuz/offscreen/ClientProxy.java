@@ -50,7 +50,7 @@ public class ClientProxy extends CommonProxy {
 
             Minecraft mc = Minecraft.getMinecraft();
             if (mc.theWorld == null || mc.thePlayer == null) return; // in menu
-            OffscreenAPI.open(new GuiInventory(Minecraft.getMinecraft().thePlayer));
+            OffscreenAPI.open(() -> new GuiInventory(Minecraft.getMinecraft().thePlayer));
             // if (WindowRegistry.INSTANCE.hasWindow()) {
             // WindowRegistry.INSTANCE.shutdown();
             // } else {
