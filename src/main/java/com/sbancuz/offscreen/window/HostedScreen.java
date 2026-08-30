@@ -7,6 +7,7 @@ import net.minecraft.client.gui.GuiScreen;
 
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.scope.Scope;
+import com.sbancuz.offscreen.window.input.FrameEvent;
 
 public final class HostedScreen<T extends HostUI> {
 
@@ -64,9 +65,9 @@ public final class HostedScreen<T extends HostUI> {
         }
     }
 
-    public void draw(Minecraft mc, float partialTicks, long now) {
+    public void draw(Minecraft mc, int mouseX, int mouseY, float partialTicks, long now) {
         bgSuppressed = screen.getGuiScreen();
-        screen.draw(mc, (int) (now % width), (int) (now % height), partialTicks, now);
+        screen.draw(mc, mouseX, mouseY, partialTicks, now);
         bgSuppressed = null;
     }
 
@@ -76,5 +77,9 @@ public final class HostedScreen<T extends HostUI> {
 
     public void update() {
         screen.update();
+    }
+
+    public void dispatchInput(FrameEvent event, float partialTicks) {
+        runWith(s -> s.onInput(event, partialTicks));
     }
 }

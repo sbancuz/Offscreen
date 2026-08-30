@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 
 import com.sbancuz.offscreen.scope.Scope;
+import com.sbancuz.offscreen.window.input.FrameEvent;
 
 public interface HostUI {
 
@@ -20,4 +21,6 @@ public interface HostUI {
     GuiScreen getGuiScreen();
 
     void draw(Minecraft mc, int mouseX, int mouseY, float partialTicks, long now);
+
+    default void onInput(FrameEvent event, float partialTicks) {}
 }

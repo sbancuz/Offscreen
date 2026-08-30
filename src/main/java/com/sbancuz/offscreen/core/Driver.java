@@ -1,23 +1,25 @@
 package com.sbancuz.offscreen.core;
 
-import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.sbancuz.offscreen.window.Window;
+import com.sbancuz.offscreen.window.input.InputRouter;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 public class Driver {
 
     public static final Driver INSTANCE = new Driver();
 
-    private final List<Window> windows = new ObjectArrayList<>();
+    private final Map<Integer, Window> windows = new ConcurrentHashMap<>();
+    private final InputRouter router = new InputRouter(windows);
 
     @SubscribeEvent
     public void onRenderTick(final TickEvent.RenderTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-        for (final Window w : windows) {
+        for (final Window w : windows.values()) {
             w.tryRenderFrame();
         }
     }
@@ -25,19 +27,18 @@ public class Driver {
     @SubscribeEvent
     public void onClientTick(final TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-        for (final Window w : windows) {
+        for (final Window w : windows.values()) {
             w.update();
         }
     }
 
     public void trackWindow(final Window window) {
-        if (windows.contains(window)) return;
-        windows.add(window);
+        if (windows.containsKey(window.getId())) return;
+        windows.put(window.getId(), window);
     }
 
     public void removeWindow(final Window window) {
-        if (!windows.contains(window)) return;
-        windows.remove(window);
+        if (!windows.containsKey(window.getId())) return;
+        windows.remove(window.getId());
     }
-
 }

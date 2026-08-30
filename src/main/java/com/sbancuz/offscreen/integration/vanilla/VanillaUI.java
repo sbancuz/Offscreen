@@ -4,15 +4,17 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainer;
 
-import com.sbancuz.offscreen.api.HostUI;
+import com.sbancuz.offscreen.Offscreen;
+import com.sbancuz.offscreen.api.MCHostUI;
 import com.sbancuz.offscreen.integration.nei.NeiScope;
 import com.sbancuz.offscreen.mixins.GuiContainerAccessor;
+import com.sbancuz.offscreen.mixins.GuiScreenAccessor;
 import com.sbancuz.offscreen.scope.FocusScope;
 import com.sbancuz.offscreen.scope.Scope;
 import com.sbancuz.offscreen.scope.ScopePipeline;
 import com.sbancuz.offscreen.scope.ScreenScope;
 
-public class VanillaUI implements HostUI {
+public class VanillaUI implements MCHostUI {
 
     private final GuiScreen screen;
     private final Scope scope;
@@ -58,5 +60,31 @@ public class VanillaUI implements HostUI {
     @Override
     public void draw(Minecraft mc, final int mouseX, final int mouseY, float partialTicks, long now) {
         screen.drawScreen(mouseX, mouseY, partialTicks);
+    }
+
+    @Override
+    public void onMouseClicked(int mouseX, int mouseY, int button) {
+        if (!(screen instanceof GuiScreenAccessor acc)) return;
+        try {
+            acc.invokeMouseClicked(mouseX, mouseY, button);
+        } catch (final Throwable t) {
+            Offscreen.LOG.trace("[secondscreen] mouseClicked failed", t);
+        }
+    }
+
+    @Override
+    public void onMouseReleased(int mouseX, int mouseY, int button) {
+        if (!(screen instanceof GuiScreenAccessor acc)) return;
+        acc.invokeMouseMovedOrUp(mouseX, mouseY, button);
+    }
+
+    @Override
+    public void onKeyTyped(char typedChar, int keyCode) {
+        if (!(screen instanceof GuiScreenAccessor acc)) return;
+        try {
+            acc.invokeKeyTyped(typedChar, keyCode);
+        } catch (final Throwable t) {
+            Offscreen.LOG.trace("[secondscreen] keyTyped failed", t);
+        }
     }
 }

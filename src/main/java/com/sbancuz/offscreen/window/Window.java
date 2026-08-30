@@ -9,8 +9,15 @@ import net.minecraft.client.gui.ScaledResolution;
 
 import org.lwjgl.opengl.GL;
 import org.lwjgl.sdl.SDLError;
+import org.lwjgl.sdl.SDLEvents;
 import org.lwjgl.sdl.SDLInit;
+import org.lwjgl.sdl.SDLKeyboard;
+import org.lwjgl.sdl.SDLKeycode;
 import org.lwjgl.sdl.SDLVideo;
+import org.lwjgl.sdl.SDL_CommonEvent;
+import org.lwjgl.sdl.SDL_Event;
+import org.lwjgl.system.MemoryUtil;
+import org.lwjglx.input.KeyCodes;
 import org.lwjglx.opengl.Display;
 import org.lwjglx.opengl.DrawableGL;
 
@@ -18,14 +25,18 @@ import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
 import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.mixins.MinecraftAccessor;
+import com.sbancuz.offscreen.window.input.FrameEvent;
+import com.sbancuz.offscreen.window.input.InputRouter;
 
 import lombok.Getter;
+import lombok.Setter;
 import lombok.SneakyThrows;
 
 public final class Window {
 
     public static final int DEFAULT_WIDTH = 1280;
     public static final int DEFAULT_HEIGHT = 800;
+    private static final int RING_CAPACITY = 256;
 
     @Getter
     private volatile int id;
@@ -44,12 +55,14 @@ public final class Window {
     private int guiWidth = 0;
     private int guiHeight = 0;
 
-    // TODO: InputRouter
-    // 1. SDL_SetEventFilter to capture events before lwjgl3ify's shared queue
-    // 2. Private ring buffer (256 entries, drop oldest on overflow)
-    // 3. Keyboard.sdlKeyPressedArray shadow swap on focus gain/loss
-    // 4. Per-frame drain(): translate coords/keycodes, accumulate TEXT_INPUT
-    // 5. Dispatch via screenStack.runScoped()
+    private final SDL_Event.Buffer ring = SDL_Event.calloc(RING_CAPACITY);
+    private int ringHead;
+    private int ringTail;
+
+    @Setter
+    boolean focusState;
+
+    private final FrameEvent frameEvent = new FrameEvent();
 
     public Window(final String title) {
         this.title = title;
@@ -114,6 +127,7 @@ public final class Window {
         if (sdlPtr == 0L) return;
         SDLVideo.SDL_DestroyWindow(sdlPtr);
         sdlPtr = 0L;
+        freeRing();
         restoreMcContext();
         Driver.INSTANCE.removeWindow(this);
     }
@@ -150,6 +164,8 @@ public final class Window {
         if (!renderer.ensureCorrectSize(pixelWidth, pixelHeight)) return;
         if (screenStack.isEmpty()) return;
 
+        drainFrameEvent();
+
         renderer.beginFrame(pixelWidth, pixelHeight, guiWidth, guiHeight);
         try {
             final long now = System.currentTimeMillis();
@@ -159,7 +175,8 @@ public final class Window {
                 if (s.needsResize(guiWidth, guiHeight)) {
                     s.resize(pixelWidth, pixelHeight, guiWidth, guiHeight);
                 }
-                s.draw(mc, partialTicks, now);
+                s.dispatchInput(frameEvent, partialTicks);
+                s.draw(mc, frameEvent.mouseX, frameEvent.mouseY, partialTicks, now);
             });
         } finally {
             renderer.endFrame(mc);
@@ -176,6 +193,79 @@ public final class Window {
 
             if (!SDLVideo.SDL_GL_SwapWindow(sdlPtr)) {
                 Offscreen.LOG.warn("[secondscreen] SDL_GL_SwapWindow failed");
+            }
+        }
+    }
+
+    public void capture(final long eventPtr) {
+        MemoryUtil.memCopy(eventPtr, ring.address(ringTail), SDL_Event.SIZEOF);
+        ringTail = (ringTail + 1) % RING_CAPACITY;
+        if (ringTail == ringHead) {
+            ringHead = (ringHead + 1) % RING_CAPACITY;
+        }
+    }
+
+    private void freeRing() {
+        ringHead = 0;
+        ringTail = 0;
+        ring.free();
+    }
+
+    private void drainFrameEvent() {
+        frameEvent.keyCount = 0;
+        frameEvent.text.setLength(0);
+        final float scaleX = (float) guiWidth / pixelWidth;
+        final float scaleY = (float) guiHeight / pixelHeight;
+        while (ringHead != ringTail) {
+            final long evAddr = ring.address(ringHead);
+            ringHead = (ringHead + 1) % RING_CAPACITY;
+            final var event = SDL_Event.create(evAddr);
+
+            switch (SDL_CommonEvent.ntype(evAddr)) {
+                case SDLEvents.SDL_EVENT_MOUSE_MOTION -> {
+                    final var motion = event.motion();
+                    frameEvent.mouseX = Math.round(motion.x() * scaleX);
+                    frameEvent.mouseY = Math.round(motion.y() * scaleY);
+                }
+                case SDLEvents.SDL_EVENT_MOUSE_BUTTON_DOWN -> {
+                    frameEvent.pressButton = InputRouter.sdlToGuiButton(
+                        event.button()
+                            .button());
+                }
+                case SDLEvents.SDL_EVENT_MOUSE_BUTTON_UP -> {
+                    frameEvent.releaseButton = InputRouter.sdlToGuiButton(
+                        event.button()
+                            .button());
+                }
+                case SDLEvents.SDL_EVENT_MOUSE_WHEEL -> {
+                    frameEvent.wheelDelta += event.wheel()
+                        .y();
+                }
+                case SDLEvents.SDL_EVENT_WINDOW_CLOSE_REQUESTED -> frameEvent.closeRequested = true;
+                case SDLEvents.SDL_EVENT_KEY_DOWN, SDLEvents.SDL_EVENT_KEY_UP -> {
+                    final var key = event.key();
+                    if (key.repeat() && !key.down()) break;
+                    final int sdlKeyCode = key.key();
+                    final int lwjglKey = KeyCodes.sdlKeycodeToLwjgl(sdlKeyCode);
+                    final int rawKeyCode = SDLKeyboard.SDL_GetKeyFromScancode(key.scancode(), key.mod(), false);
+                    char c = Character.MIN_VALUE;
+                    if (rawKeyCode >= SDLKeycode.SDLK_SPACE && rawKeyCode <= SDLKeycode.SDLK_TILDE) {
+                        c = (char) rawKeyCode;
+                        if ((key.mod() & SDLKeycode.SDL_KMOD_CTRL) != 0) {
+                            c = (char) (sdlKeyCode & 0x1f);
+                        }
+                    }
+                    if (frameEvent.keyCount < frameEvent.keys.length) {
+                        frameEvent.keys[frameEvent.keyCount++].set(lwjglKey, c, key.down())
+                            .setSdl(sdlKeyCode, key.scancode(), key.mod());
+                    }
+                }
+                case SDLEvents.SDL_EVENT_TEXT_INPUT -> {
+                    final String text = event.text()
+                        .textString();
+                    if (text != null) frameEvent.text.append(text);
+                }
+                default -> {}
             }
         }
     }
