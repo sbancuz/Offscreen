@@ -19,5 +19,5 @@ public interface HostUI {
 
     GuiScreen getGuiScreen();
 
-    void draw(Minecraft mc, float partialTicks, long now);
+    void draw(Minecraft mc, int mouseX, int mouseY, float partialTicks, long now);
 }

@@ -66,11 +66,15 @@ public final class HostedScreen<T extends HostUI> {
 
     public void draw(Minecraft mc, float partialTicks, long now) {
         bgSuppressed = screen.getGuiScreen();
-        screen.draw(mc, partialTicks, now);
+        screen.draw(mc, (int) (now % width), (int) (now % height), partialTicks, now);
         bgSuppressed = null;
     }
 
     public void requestResize() {
         resizeRequested = true;
+    }
+
+    public void update() {
+        screen.update();
     }
 }

@@ -26,9 +26,7 @@ public class Mui2UI implements HostUI {
     }
 
     @Override
-    public void draw(Minecraft mc, float partialTicks, long now) {
-
-    }
+    public void draw(Minecraft mc, final int mouseX, final int mouseY, float partialTicks, long now) {}
 
     public void onResize(final int width, final int height) {
         screen.onResize(width, height);

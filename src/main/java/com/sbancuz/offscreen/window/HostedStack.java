@@ -1,5 +1,7 @@
 package com.sbancuz.offscreen.window;
 
+import java.util.function.Consumer;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 
@@ -24,14 +26,15 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
         }
     }
 
-    public void runScoped(final Runnable action) {
+    public void runScoped(final Consumer<HostedScreen<?>> action) {
         final HostedScreen<?> screen = top();
         final GuiScreen savedScreen = Minecraft.getMinecraft().currentScreen;
         boolean poisoned = false;
-        screen.scope().enter();
+        screen.scope()
+            .enter();
 
         try {
-            action.run();
+            action.accept(screen);
         } catch (final Throwable t) {
             poisoned = true;
             Offscreen.LOG.error("[secondscreen] scoped action failed", t);
@@ -43,7 +46,8 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
                     Offscreen.LOG.error("[secondscreen] screen-change handling failed", t);
                 }
             }
-            screen.scope().restore();
+            screen.scope()
+                .restore();
         }
     }
 
@@ -77,8 +81,11 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
         final HostedScreen<?> entry = new HostedScreen<>(new VanillaUI(stolen));
         entry.requestResize();
         push(entry);
-        Offscreen.LOG.info("[secondscreen] STEAL {} (depth {})",
-            stolen.getClass().getSimpleName(), size());
+        Offscreen.LOG.info(
+            "[secondscreen] STEAL {} (depth {})",
+            stolen.getClass()
+                .getSimpleName(),
+            size());
     }
 
 }

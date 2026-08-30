@@ -45,11 +45,11 @@ public final class Window {
     private int guiHeight = 0;
 
     // TODO: InputRouter
-    //  1. SDL_SetEventFilter to capture events before lwjgl3ify's shared queue
-    //  2. Private ring buffer (256 entries, drop oldest on overflow)
-    //  3. Keyboard.sdlKeyPressedArray shadow swap on focus gain/loss
-    //  4. Per-frame drain(): translate coords/keycodes, accumulate TEXT_INPUT
-    //  5. Dispatch via screenStack.runScoped()
+    // 1. SDL_SetEventFilter to capture events before lwjgl3ify's shared queue
+    // 2. Private ring buffer (256 entries, drop oldest on overflow)
+    // 3. Keyboard.sdlKeyPressedArray shadow swap on focus gain/loss
+    // 4. Per-frame drain(): translate coords/keycodes, accumulate TEXT_INPUT
+    // 5. Dispatch via screenStack.runScoped()
 
     public Window(final String title) {
         this.title = title;
@@ -154,13 +154,13 @@ public final class Window {
         try {
             final long now = System.currentTimeMillis();
             final float partialTicks = ((MinecraftAccessor) mc).getTimer().renderPartialTicks;
-            final HostedScreen<?> screen = screenStack.top();
 
-            if (screen.needsResize(guiWidth, guiHeight)) {
-                screen.resize(pixelWidth, pixelHeight, guiWidth, guiHeight);
-            }
-
-            screenStack.runScoped(() -> screen.draw(mc, partialTicks, now));
+            screenStack.runScoped(s -> {
+                if (s.needsResize(guiWidth, guiHeight)) {
+                    s.resize(pixelWidth, pixelHeight, guiWidth, guiHeight);
+                }
+                s.draw(mc, partialTicks, now);
+            });
         } finally {
             renderer.endFrame(mc);
         }
@@ -203,7 +203,6 @@ public final class Window {
 
     public void update() {
         if (screenStack.isEmpty()) return;
-        screenStack.top()
-            .runWith(HostUI::update);
+        screenStack.runScoped(HostedScreen::update);
     }
 }

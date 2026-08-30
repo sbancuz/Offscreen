@@ -22,7 +22,7 @@ public class VanillaUI implements HostUI {
         this.scope = ScopePipeline.builder()
             .always(new FocusScope())
             .always(new ScreenScope(this::getGuiScreen))
-            .ifModLoaded("NotEnoughItems", NeiScope::new)
+            .ifModLoaded("NotEnoughItems", () -> new NeiScope((GuiContainer) this.getGuiScreen()))
             .build();
     }
 
@@ -56,7 +56,7 @@ public class VanillaUI implements HostUI {
     }
 
     @Override
-    public void draw(Minecraft mc, float partialTicks, long now) {
-        screen.drawScreen(0, 0, partialTicks);
+    public void draw(Minecraft mc, final int mouseX, final int mouseY, float partialTicks, long now) {
+        screen.drawScreen(mouseX, mouseY, partialTicks);
     }
 }
