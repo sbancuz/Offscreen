@@ -145,6 +145,7 @@ public final class Window {
 
     public void tryRenderFrame() {
         if (!isOpen()) return;
+        renderer.setFocused(focusState);
         if (!renderer.isTimeToRender()) return;
 
         renderFrame();
@@ -289,6 +290,46 @@ public final class Window {
     public void setUI(HostUI ui) {
         screenStack.clear();
         screenStack.push(new HostedScreen<>(ui));
+    }
+
+    public void push(HostUI ui) {
+        screenStack.push(new HostedScreen<>(ui));
+    }
+
+    public boolean pop() {
+        if (screenStack.size() <= 1) return false;
+        final HostedScreen<?> popped = screenStack.pop();
+        popped.dispose();
+        if (!screenStack.isEmpty()) {
+            screenStack.top()
+                .requestResize();
+        }
+        return true;
+    }
+
+    public HostUI getCurrentUI() {
+        if (screenStack.isEmpty()) return null;
+        return screenStack.top()
+            .screen();
+    }
+
+    public int getScreenDepth() {
+        return screenStack.size();
+    }
+
+    public void resize(int width, int height) {
+        SDLVideo.SDL_SetWindowSize(sdlPtr, width, height);
+        probeDrawableSize();
+        if (!screenStack.isEmpty()) {
+            screenStack.top()
+                .requestResize();
+        }
+        restoreMcContext();
+    }
+
+    public void setTitle(String title) {
+        SDLVideo.SDL_SetWindowTitle(sdlPtr, title);
+        restoreMcContext();
     }
 
     public void update() {

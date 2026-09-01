@@ -1,13 +1,16 @@
 package com.sbancuz.offscreen;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiInventory;
 import net.minecraft.client.settings.KeyBinding;
 
 import org.lwjgl.input.Keyboard;
 
 import com.sbancuz.offscreen.api.OffscreenAPI;
+import com.sbancuz.offscreen.api.UIRegistry;
 import com.sbancuz.offscreen.core.Driver;
+import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
 
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -35,6 +38,15 @@ public class ClientProxy extends CommonProxy {
         FMLCommonHandler.instance()
             .bus()
             .register(Driver.INSTANCE);
+
+        UIRegistry.register(GuiScreen.class, screen -> new VanillaUI((GuiScreen) screen));
+        try {
+            final Class<?> modularScreen = Class.forName("com.cleanroommc.modularui.screen.ModularScreen");
+            UIRegistry.register(
+                modularScreen,
+                screen -> new com.sbancuz.offscreen.integration.mui2.Mui2UI(
+                    (com.cleanroommc.modularui.screen.ModularScreen) screen));
+        } catch (final ClassNotFoundException ignored) {}
     }
 
     @SubscribeEvent

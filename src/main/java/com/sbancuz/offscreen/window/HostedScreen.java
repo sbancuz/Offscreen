@@ -29,6 +29,10 @@ public final class HostedScreen<T extends HostUI> {
         this.mc = Minecraft.getMinecraft();
     }
 
+    public T screen() {
+        return screen;
+    }
+
     public Scope scope() {
         return screen.scope();
     }

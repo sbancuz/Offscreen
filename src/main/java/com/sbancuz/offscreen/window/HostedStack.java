@@ -6,14 +6,16 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 
 import com.sbancuz.offscreen.Offscreen;
-import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
+import com.sbancuz.offscreen.api.HostUI;
+import com.sbancuz.offscreen.api.UIRegistry;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
+import javax.annotation.Nullable;
+
 public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
 
-    public HostedScreen<?> findEntry(final GuiScreen screen) {
-        if (screen == null) return null;
+    public @Nullable  HostedScreen<?> findEntry(final GuiScreen screen) {
         for (HostedScreen<?> hostedScreen : this) {
             if (hostedScreen.getGuiScreen() == screen) return hostedScreen;
         }
@@ -78,12 +80,20 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
     }
 
     public void pushStolen(final GuiScreen stolen) {
-        final HostedScreen<?> entry = new HostedScreen<>(new VanillaUI(stolen));
+        final HostUI ui = UIRegistry.resolve(stolen);
+        if (ui == null) {
+            Offscreen.LOG.warn("[secondscreen] no UI factory for stolen screen: {}", stolen.getClass()
+                .getSimpleName());
+            return;
+        }
+        final HostedScreen<?> entry = new HostedScreen<>(ui);
         entry.requestResize();
         push(entry);
         Offscreen.LOG.info(
-            "[secondscreen] STEAL {} (depth {})",
+            "[secondscreen] STEAL {} (adapter: {}, depth {})",
             stolen.getClass()
+                .getSimpleName(),
+            ui.getClass()
                 .getSimpleName(),
             size());
     }

@@ -1,7 +1,10 @@
 package com.sbancuz.offscreen.core;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 
 import com.sbancuz.offscreen.window.Window;
 import com.sbancuz.offscreen.window.input.InputRouter;
@@ -40,5 +43,31 @@ public class Driver {
     public void removeWindow(final Window window) {
         if (!windows.containsKey(window.getId())) return;
         windows.remove(window.getId());
+    }
+
+    public Collection<Window> getWindows() {
+        return Collections.unmodifiableCollection(windows.values());
+    }
+
+    public int getWindowCount() {
+        return windows.size();
+    }
+
+    public Window getWindow(int id) {
+        return windows.get(id);
+    }
+
+    public void closeAll() {
+        for (final Window w : windows.values()) {
+            w.destroy();
+        }
+    }
+
+    public void closeAll(Predicate<Window> predicate) {
+        for (final Window w : windows.values()) {
+            if (predicate.test(w)) {
+                w.destroy();
+            }
+        }
     }
 }

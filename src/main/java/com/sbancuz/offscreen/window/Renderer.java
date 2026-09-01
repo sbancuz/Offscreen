@@ -11,11 +11,12 @@ import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL30C;
 import org.lwjgl.opengl.GL32C;
 
+import com.sbancuz.offscreen.Config;
 import com.sbancuz.offscreen.Offscreen;
 
 public final class Renderer {
 
-    private int targetFps = 60;
+    private int targetFps = Config.focusedFps;
     private int step = 1000 / targetFps;
     private long nextFrameMs = 0;
 
@@ -40,6 +41,15 @@ public final class Renderer {
         if (now < nextFrameMs) return false;
         nextFrameMs = now + step;
         return true;
+    }
+
+    public void setFocused(boolean focused) {
+        final int newFps = focused ? Config.focusedFps : Config.unfocusedFps;
+        if (targetFps != newFps) {
+            targetFps = newFps;
+            step = 1000 / targetFps;
+            nextFrameMs = 0;
+        }
     }
 
     public void beginFrame(final int width, final int height, final int guiWidth, final int guiHeight) {

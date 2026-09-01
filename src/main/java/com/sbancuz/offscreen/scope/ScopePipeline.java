@@ -9,6 +9,8 @@ import com.sbancuz.offscreen.Offscreen;
 
 import cpw.mods.fml.common.Loader;
 
+import javax.annotation.Nullable;
+
 public final class ScopePipeline implements Scope {
 
     private final Scope[] scopes;
@@ -43,7 +45,7 @@ public final class ScopePipeline implements Scope {
         unwind(null);
     }
 
-    private void unwind(final Throwable enterFailureOrNull) {
+    private void unwind(final @Nullable  Throwable enterFailureOrNull) {
         if (enterFailureOrNull != null) {
             Offscreen.LOG
                 .error("[secondscreen] scope enter() failed; unwinding already-entered scopes", enterFailureOrNull);

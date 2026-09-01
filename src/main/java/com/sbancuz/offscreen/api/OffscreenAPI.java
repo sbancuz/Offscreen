@@ -1,21 +1,126 @@
 package com.sbancuz.offscreen.api;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.gui.inventory.GuiInventory;
-
-import com.sbancuz.offscreen.integration.vanilla.VanillaUI;
+import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.window.Window;
+
+import javax.annotation.Nullable;
 
 public final class OffscreenAPI {
 
-    // TODO: Maybe use windowHandle or something
-    public static Window open(Supplier<GuiScreen> screen) {
-        final Window w = new Window(screen.toString());
+    private OffscreenAPI() {}
 
-        w.setUI(new VanillaUI(new GuiInventory(Minecraft.getMinecraft().thePlayer)));
+    public static @Nullable Window open(Supplier<?> screenFactory) {
+        final Object screen = screenFactory.get();
+        if (screen == null) return null;
+        final HostUI ui = UIRegistry.resolve(screen);
+        if (ui == null) return null;
+        final Window w = new Window(screen.toString());
+        w.setUI(ui);
         return w;
+    }
+
+    public static <H extends HostUI> @Nullable Window open(Supplier<?> screenFactory, UIFactory<H> factory) {
+        final Object screen = screenFactory.get();
+        if (screen == null) return null;
+        final HostUI ui = factory.create(screen);
+        if (ui == null) return null;
+        final Window w = new Window(screen.toString());
+        w.setUI(ui);
+        return w;
+    }
+
+    public static void close(@Nullable Window window) {
+        if (window == null) return;
+        window.destroy();
+    }
+
+    public static void closeAll() {
+        Driver.INSTANCE.closeAll();
+    }
+
+    public static void closeAll(@Nullable Predicate<Window> predicate) {
+        if (predicate == null) return;
+        Driver.INSTANCE.closeAll(predicate);
+    }
+
+    public static Collection<Window> getWindows() {
+        return Driver.INSTANCE.getWindows();
+    }
+
+    public static int getWindowCount() {
+        return Driver.INSTANCE.getWindowCount();
+    }
+
+    public static @Nullable Window getWindow(int id) {
+        return Driver.INSTANCE.getWindow(id);
+    }
+
+    public static boolean isOpen(@Nullable Window window) {
+        return window != null && window.isOpen();
+    }
+
+    public static void push(@Nullable Window window, @Nullable HostUI ui) {
+        if (window == null || ui == null) return;
+        window.push(ui);
+    }
+
+    public static void push(@Nullable Window window, @Nullable Supplier<?> screenFactory) {
+        if (window == null || screenFactory == null) return;
+        final Object screen = screenFactory.get();
+        if (screen == null) return;
+        final HostUI ui = UIRegistry.resolve(screen);
+        if (ui == null) return;
+        window.push(ui);
+    }
+
+    public static boolean pop(@Nullable Window window) {
+        if (window == null) return false;
+        return window.pop();
+    }
+
+    public static @Nullable HostUI getCurrentUI(@Nullable Window window) {
+        if (window == null) return null;
+        return window.getCurrentUI();
+    }
+
+    public static int getScreenDepth(@Nullable Window window) {
+        if (window == null) return 0;
+        return window.getScreenDepth();
+    }
+
+    public static void resize(@Nullable Window window, int width, int height) {
+        if (window == null) return;
+        window.resize(width, height);
+    }
+
+    public static void setTitle(@Nullable Window window, @Nullable String title) {
+        if (window == null || title == null) return;
+        window.setTitle(title);
+    }
+
+    public static @Nullable Window findByTitle(@Nullable String title) {
+        if (title == null) return null;
+        for (Window w : Driver.INSTANCE.getWindows()) {
+            if (w.getTitle()
+                .equals(title)) {
+                return w;
+            }
+        }
+        return null;
+    }
+
+    public static @Nullable Window findByTitle(@Nullable Predicate<String> predicate) {
+        if (predicate == null) return null;
+        for (Window w : Driver.INSTANCE.getWindows()) {
+            if (predicate.test(w.getTitle())) {
+                return w;
+            }
+        }
+        return null;
     }
 }
