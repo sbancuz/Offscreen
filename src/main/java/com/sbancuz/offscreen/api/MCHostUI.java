@@ -22,15 +22,17 @@ public interface MCHostUI extends HostUI {
             event.wheelDelta = 0f;
             onMouseScroll(event.mouseX, event.mouseY, scroll);
         }
-        for (int i = 0; i < event.keyCount; i++) {
-            final KeyEvent key = event.keys[i];
-            onKeyTyped(key.character(), key.keyCode());
-        }
-
         if (!event.text.isEmpty()) {
             final String text = event.text.toString();
             event.text.setLength(0);
             onTextInput(text);
+        }
+
+        for (int i = 0; i < event.keyCount; i++) {
+            final KeyEvent key = event.keys[i];
+            if (key.pressed()) {
+                onKeyTyped(key.character(), key.keyCode());
+            }
         }
     }
 

@@ -5,11 +5,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 
+import javax.annotation.Nullable;
+
 import com.sbancuz.offscreen.Offscreen;
 
 import cpw.mods.fml.common.Loader;
-
-import javax.annotation.Nullable;
 
 public final class ScopePipeline implements Scope {
 
@@ -45,7 +45,7 @@ public final class ScopePipeline implements Scope {
         unwind(null);
     }
 
-    private void unwind(final @Nullable  Throwable enterFailureOrNull) {
+    private void unwind(final @Nullable Throwable enterFailureOrNull) {
         if (enterFailureOrNull != null) {
             Offscreen.LOG
                 .error("[secondscreen] scope enter() failed; unwinding already-entered scopes", enterFailureOrNull);

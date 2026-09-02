@@ -2,6 +2,8 @@ package com.sbancuz.offscreen.window.input;
 
 public class FrameEvent {
 
+    public static final FrameEvent EMPTY = new FrameEvent();
+
     private static final int RING_CAPACITY = 256;
 
     public int mouseX = -1;

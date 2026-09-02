@@ -1,7 +1,5 @@
 package com.sbancuz.offscreen.window;
 
-import java.util.function.Consumer;
-
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 
@@ -41,13 +39,12 @@ public final class HostedScreen<T extends HostUI> {
         return screen.getGuiScreen();
     }
 
-    public void resize(final int windowWidth, final int windowHeight, final int guiWidth, final int guiHeight) {
+    public void resize(final int guiWidth, final int guiHeight) {
         this.width = guiWidth;
         this.height = guiHeight;
 
-        runWith(
-            s -> s.getGuiScreen()
-                .setWorldAndResolution(mc, windowWidth, windowHeight));
+        screen.getGuiScreen()
+            .setWorldAndResolution(mc, guiWidth, guiHeight);
         screen.onResize(width, height);
     }
 
@@ -57,16 +54,6 @@ public final class HostedScreen<T extends HostUI> {
 
     public boolean needsResize(final int width, final int height) {
         return resizeRequested || this.width != width || this.height != height;
-    }
-
-    public void runWith(final Consumer<T> r) {
-        final GuiScreen prev = mc.currentScreen;
-        mc.currentScreen = screen.getGuiScreen();
-        try {
-            r.accept(screen);
-        } finally {
-            mc.currentScreen = prev;
-        }
     }
 
     public void draw(Minecraft mc, int mouseX, int mouseY, float partialTicks, long now) {
@@ -84,6 +71,6 @@ public final class HostedScreen<T extends HostUI> {
     }
 
     public void dispatchInput(FrameEvent event, float partialTicks) {
-        runWith(s -> s.onInput(event, partialTicks));
+        screen.onInput(event, partialTicks);
     }
 }

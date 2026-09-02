@@ -116,6 +116,10 @@ public final class Window {
         }
         restoreMcContext();
 
+        if (!SDLKeyboard.SDL_StartTextInput(sdlPtr)) {
+            Offscreen.LOG.warn("[secondscreen] SDL_StartTextInput failed: {}", sdlError());
+        }
+
         Driver.INSTANCE.trackWindow(this);
     }
 
@@ -125,6 +129,7 @@ public final class Window {
 
     public void destroy() {
         if (sdlPtr == 0L) return;
+        SDLKeyboard.SDL_StopTextInput(sdlPtr);
         SDLVideo.SDL_DestroyWindow(sdlPtr);
         sdlPtr = 0L;
         freeRing();
@@ -172,9 +177,9 @@ public final class Window {
             final long now = System.currentTimeMillis();
             final float partialTicks = ((MinecraftAccessor) mc).getTimer().renderPartialTicks;
 
-            screenStack.runScoped(s -> {
+            screenStack.runScoped(frameEvent, pixelWidth, pixelHeight, s -> {
                 if (s.needsResize(guiWidth, guiHeight)) {
-                    s.resize(pixelWidth, pixelHeight, guiWidth, guiHeight);
+                    s.resize(guiWidth, guiHeight);
                 }
                 s.dispatchInput(frameEvent, partialTicks);
                 s.draw(mc, frameEvent.mouseX, frameEvent.mouseY, partialTicks, now);

@@ -1,14 +1,13 @@
 package com.sbancuz.offscreen.api;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import javax.annotation.Nullable;
+
 import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.window.Window;
-
-import javax.annotation.Nullable;
 
 public final class OffscreenAPI {
 

@@ -5,8 +5,15 @@
   "compatibilityLevel": "JAVA_8",
   "client": [
     "GuiContainerAccessor",
+    "GuiDrawMixin",
     "GuiScreenAccessor",
     "GuiScreenBackground",
     "MinecraftAccessor"
+  ],
+  "mixins": [
+    "BookmarkPanelAccessor",
+    "ItemPanelsAccessor",
+    "LayoutManagerAccessor",
+    "SearchFieldMixin"
   ]
 }
