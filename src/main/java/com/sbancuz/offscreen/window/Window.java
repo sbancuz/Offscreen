@@ -252,18 +252,44 @@ public final class Window {
                     final var key = event.key();
                     if (key.repeat() && !key.down()) break;
                     final int sdlKeyCode = key.key();
+                    final int sdlScanCode = key.scancode();
                     final int lwjglKey = KeyCodes.sdlKeycodeToLwjgl(sdlKeyCode);
-                    final int rawKeyCode = SDLKeyboard.SDL_GetKeyFromScancode(key.scancode(), key.mod(), false);
+                    // Use sdlKeyCode directly for char (respects layout, avoids scancode->keycode roundtrip
+                    // which can be off by one if struct layout mismatches). PlanNH does the same
+                    // scancode->keycode via SDL_GetKeyFromScancode, but we keep both for comparison
+                    // and prefer sdlKeyCode when it is printable.
+                    final int rawKeyCode = SDLKeyboard.SDL_GetKeyFromScancode(sdlScanCode, key.mod(), false);
                     char c = Character.MIN_VALUE;
-                    if (rawKeyCode >= SDLKeycode.SDLK_SPACE && rawKeyCode <= SDLKeycode.SDLK_TILDE) {
-                        c = (char) rawKeyCode;
+                    int charSource = sdlKeyCode;
+                    // Prefer sdlKeyCode if it is printable, else fall back to raw
+                    if (sdlKeyCode >= SDLKeycode.SDLK_SPACE && sdlKeyCode <= SDLKeycode.SDLK_TILDE) {
+                        charSource = sdlKeyCode;
+                    } else if (rawKeyCode >= SDLKeycode.SDLK_SPACE && rawKeyCode <= SDLKeycode.SDLK_TILDE) {
+                        charSource = rawKeyCode;
+                    } else {
+                        charSource = -1;
+                    }
+                    if (charSource != -1) {
+                        c = (char) charSource;
                         if ((key.mod() & SDLKeycode.SDL_KMOD_CTRL) != 0) {
                             c = (char) (sdlKeyCode & 0x1f);
+                        }
+                        // Debug aid for a->s shift: log mismatches between scancode-derived and keycode
+                        if (rawKeyCode != sdlKeyCode && rawKeyCode >= 32 && rawKeyCode <= 126
+                            && sdlKeyCode >= 32 && sdlKeyCode <= 126) {
+                            Offscreen.LOG.debug(
+                                "[secondscreen] keycode mismatch scancode {} -> raw {} ('{}') vs sdlKey {} ('{}') lwjgl {}",
+                                sdlScanCode,
+                                rawKeyCode,
+                                (char) rawKeyCode,
+                                sdlKeyCode,
+                                (char) sdlKeyCode,
+                                lwjglKey);
                         }
                     }
                     if (frameEvent.keyCount < frameEvent.keys.length) {
                         frameEvent.keys[frameEvent.keyCount++].set(lwjglKey, c, key.down())
-                            .setSdl(sdlKeyCode, key.scancode(), key.mod());
+                            .setSdl(sdlKeyCode, sdlScanCode, key.mod());
                     }
                 }
                 case SDLEvents.SDL_EVENT_TEXT_INPUT -> {

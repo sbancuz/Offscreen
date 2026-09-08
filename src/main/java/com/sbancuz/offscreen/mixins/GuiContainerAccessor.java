@@ -15,7 +15,13 @@ public interface GuiContainerAccessor {
     int getYSize();
 
     @Accessor("guiLeft")
+    int getGuiLeft();
+
+    @Accessor("guiLeft")
     void setGuiLeft(final int l);
+
+    @Accessor("guiTop")
+    int getGuiTop();
 
     @Accessor("guiTop")
     void setGuiTop(final int t);

@@ -4,20 +4,44 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 
 import com.cleanroommc.modularui.api.UpOrDown;
+import com.cleanroommc.modularui.screen.ClientScreenHandler;
+import com.cleanroommc.modularui.screen.GuiContainerWrapper;
+import com.cleanroommc.modularui.screen.ModularContainer;
 import com.cleanroommc.modularui.screen.ModularScreen;
 import com.sbancuz.offscreen.api.HostUI;
-import com.sbancuz.offscreen.window.input.FrameEvent;
+import com.sbancuz.offscreen.scope.MuiScope;
+import com.sbancuz.offscreen.scope.Scope;
+import com.sbancuz.offscreen.scope.ScopePipeline;
+import com.sbancuz.offscreen.scope.ScreenScope;
 
 import me.eigenraven.lwjgl3ify.api.InputEvents;
 
 public class Mui2UI implements HostUI {
 
     private final ModularScreen screen;
-    private int dragButton = -1;
-    private long dragStartMs;
+    private final GuiScreen wrapper;
+    private final Scope scope;
 
     public Mui2UI(ModularScreen screen) {
         this.screen = screen;
+        if (screen.getScreenWrapper() != null) {
+            this.wrapper = screen.getScreenWrapper()
+                .getGuiScreen();
+        } else {
+            ModularContainer container = new ModularContainer();
+            container.constructClientOnly();
+            this.wrapper = new GuiContainerWrapper(container, screen).getGuiScreen();
+        }
+
+        this.scope = ScopePipeline.builder()
+            .always(new ScreenScope(() -> this.wrapper))
+            .always(new MuiScope(this.screen))
+            .build();
+    }
+
+    @Override
+    public Scope scope() {
+        return scope;
     }
 
     @Override
@@ -27,73 +51,66 @@ public class Mui2UI implements HostUI {
 
     @Override
     public GuiScreen getGuiScreen() {
-        return screen.getScreenWrapper()
-            .getGuiScreen();
+        return wrapper;
     }
 
     @Override
-    public void draw(Minecraft mc, final int mouseX, final int mouseY, float partialTicks, long now) {}
+    public void clearComponentFocus() {
+        screen.getContext().removeFocus();
+    }
+
+    @Override
+    public void draw(Minecraft mc, final int mouseX, final int mouseY, float partialTicks, long now) {
+        ClientScreenHandler.drawScreen(screen, wrapper, mouseX, mouseY, partialTicks);
+        screen.onFrameUpdate();
+    }
 
     public void onResize(final int width, final int height) {
         screen.onResize(width, height);
     }
 
     @Override
-    public void onInput(FrameEvent event, float partialTicks) {
-        final Minecraft mc = Minecraft.getMinecraft();
-        final int mouseX = Math.max(event.mouseX, 0);
-        final int mouseY = Math.max(event.mouseY, 0);
-
+    public void onHoverUpdate(int mouseX, int mouseY, float partialTicks) {
+        int mx = Math.max(mouseX, 0);
+        int my = Math.max(mouseY, 0);
         screen.getContext()
-            .updateState(mouseX, mouseY, partialTicks);
+            .updateState(mx, my, partialTicks);
         screen.getContext()
             .reset();
+    }
 
-        if (event.pressButton != -1) {
-            final int button = event.pressButton;
-            event.pressButton = -1;
-            screen.onMousePressed(button);
-            dragButton = button;
-            dragStartMs = System.currentTimeMillis();
-        }
-        if (event.releaseButton != -1) {
-            final int button = event.releaseButton;
-            event.releaseButton = -1;
-            screen.onMouseRelease(button);
-            if (dragButton == button) dragButton = -1;
-        }
-        if (dragButton != -1) {
-            final long heldMs = System.currentTimeMillis() - dragStartMs;
-            screen.onMouseDrag(dragButton, heldMs);
-        }
-        if (event.wheelDelta != 0f) {
-            final UpOrDown dir = event.wheelDelta > 0 ? UpOrDown.UP : UpOrDown.DOWN;
-            event.wheelDelta = 0f;
-            screen.onMouseScroll(dir, 1);
-        }
+    @Override
+    public void onMouseClicked(int mouseX, int mouseY, int button) {
+        screen.onMousePressed(button);
+    }
 
-        for (int i = 0; i < event.keyCount; i++) {
-            final var key = event.keys[i];
-            if (key.pressed()) {
-                screen.onKeyPressed(key.character(), key.keyCode());
-            } else {
-                screen.onKeyRelease(key.character(), key.keyCode());
-            }
-            InputEvents.injectKeyEvent(
-                new InputEvents.KeyEvent(
-                    key.keyCode(),
-                    0,
-                    key.sdlKeyCode(),
-                    key.sdlScanCode(),
-                    0,
-                    key.pressed() ? InputEvents.KeyAction.PRESSED : InputEvents.KeyAction.RELEASED,
-                    (short) key.sdlMod(),
-                    0L));
-        }
-        if (!event.text.isEmpty()) {
-            final String text = event.text.toString();
-            event.text.setLength(0);
-            InputEvents.injectTextEvent(new InputEvents.TextEvent(text));
-        }
+    @Override
+    public void onMouseReleased(int mouseX, int mouseY, int button) {
+        screen.onMouseRelease(button);
+    }
+
+    @Override
+    public void onMouseDrag(int mouseX, int mouseY, int button, long heldMs) {
+        screen.onMouseDrag(button, heldMs);
+    }
+
+    @Override
+    public void onMouseScroll(int mouseX, int mouseY, int scroll) {
+        screen.onMouseScroll(scroll > 0 ? UpOrDown.UP : UpOrDown.DOWN, 1);
+    }
+
+    @Override
+    public void onKeyTyped(char typedChar, int keyCode) {
+        screen.onKeyPressed(typedChar, keyCode);
+    }
+
+    @Override
+    public void onKeyReleased(char typedChar, int keyCode) {
+        screen.onKeyRelease(typedChar, keyCode);
+    }
+
+    @Override
+    public void onTextInput(String text) {
+        InputEvents.injectTextEvent(new InputEvents.TextEvent(text));
     }
 }

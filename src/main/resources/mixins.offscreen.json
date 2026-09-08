@@ -4,6 +4,8 @@
   "refmap": "mixins.offscreen.refmap.json",
   "compatibilityLevel": "JAVA_8",
   "client": [
+    "ClientScreenHandlerAccessor",
+    "GLScissorHelperMixin",
     "GuiContainerAccessor",
     "GuiDrawMixin",
     "GuiScreenAccessor",

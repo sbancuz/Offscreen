@@ -17,6 +17,7 @@ public final class OffscreenAPI {
         final Object screen = screenFactory.get();
         if (screen == null) return null;
         final HostUI ui = UIRegistry.resolve(screen);
+        System.out.println(ui);
         if (ui == null) return null;
         final Window w = new Window(screen.toString());
         w.setUI(ui);
