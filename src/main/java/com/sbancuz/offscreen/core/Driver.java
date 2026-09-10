@@ -11,6 +11,7 @@ import com.sbancuz.offscreen.window.input.InputRouter;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
+import net.minecraft.client.Minecraft;
 
 public class Driver {
 
@@ -30,6 +31,10 @@ public class Driver {
     @SubscribeEvent
     public void onClientTick(final TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
+        if (Minecraft.getMinecraft().theWorld == null && !windows.isEmpty()) {
+            closeAll();
+            return;
+        }
         for (final Window w : windows.values()) {
             w.update();
         }

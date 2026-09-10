@@ -172,6 +172,11 @@ public final class Window {
 
         drainFrameEvent();
 
+        if (frameEvent.closeRequested) {
+            destroy();
+            return;
+        }
+
         renderer.beginFrame(pixelWidth, pixelHeight, guiWidth, guiHeight);
         try {
             final long now = System.currentTimeMillis();
@@ -364,7 +369,7 @@ public final class Window {
     }
 
     public void update() {
-        if (screenStack.isEmpty()) return;
+        if (!isOpen() || screenStack.isEmpty()) return;
         screenStack.runScoped(HostedScreen::update);
     }
 }
