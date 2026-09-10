@@ -14,6 +14,7 @@ import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.item.ItemStack;
 
 import com.sbancuz.offscreen.mixins.BookmarkPanelAccessor;
+import com.sbancuz.offscreen.mixins.GuiContainerAccessor;
 import com.sbancuz.offscreen.mixins.ItemPanelsAccessor;
 import com.sbancuz.offscreen.mixins.LayoutManagerAccessor;
 import com.sbancuz.offscreen.scope.Scope;
@@ -62,9 +63,7 @@ public final class NeiScope implements Scope {
     private final Supplier<GuiContainer> containerSupplier;
     private final Ctx own = new Ctx();
     private final Ctx saved = new Ctx();
-    private BookmarkPanel originalBookmarkPanel;
     private int enteredCount = 0;
-    private ItemsLoadedCallback loadCallback;
 
     public NeiScope(final Supplier<GuiContainer> containerSupplier) {
         this.containerSupplier = containerSupplier;
@@ -72,8 +71,8 @@ public final class NeiScope implements Scope {
         saved.capture();
         saved.manager = NEIController.manager;
 
-        this.originalBookmarkPanel = saved.bookmarkPanel;
-        final BookmarkStorage originalStorage = ((BookmarkPanelAccessor) this.originalBookmarkPanel).getStorage();
+        BookmarkPanel originalBookmarkPanel = saved.bookmarkPanel;
+        final BookmarkStorage originalStorage = ((BookmarkPanelAccessor) originalBookmarkPanel).getStorage();
 
         final BookmarkPanel offscreenPanel = new BookmarkPanel();
         ((BookmarkPanelAccessor) offscreenPanel).setStorage(originalStorage);
@@ -97,7 +96,7 @@ public final class NeiScope implements Scope {
 
         searchFieldScopes.put(own.searchField, this);
 
-        loadCallback = () -> {
+        ItemsLoadedCallback loadCallback = () -> {
             if (enteredCount > 0) {
                 filterOffscreenItems(own.searchField.getFilter());
             }
@@ -119,9 +118,16 @@ public final class NeiScope implements Scope {
 
         NEIController.manager = own.manager;
         own.apply();
+        LayoutManager.bookmarkPanel.update();
 
         if (container != null) {
+            final GuiContainerAccessor accessor = (GuiContainerAccessor) container;
+            final int savedLeft = accessor.getGuiLeft();
+            if (savedLeft < 82) {
+                accessor.setGuiLeft(82);
+            }
             LayoutManager.layout(container);
+            accessor.setGuiLeft(savedLeft);
         }
 
         if (!LayoutManager.itemsLoaded) {
@@ -147,17 +153,6 @@ public final class NeiScope implements Scope {
         saved.clear();
     }
 
-    public void dispose() {
-        if (loadCallback != null) {
-            ItemList.loadCallbacks.remove(loadCallback);
-            loadCallback = null;
-        }
-        searchFieldScopes.remove(own.searchField);
-        originalBookmarkPanel = null;
-        own.clear();
-        saved.clear();
-    }
-
     public static boolean isOffscreenSearchField(SearchField field) {
         return searchFieldScopes.containsKey(field);
     }
@@ -169,7 +164,7 @@ public final class NeiScope implements Scope {
         }
     }
 
-    private void filterOffscreenItems(final ItemFilter filter) {
+    private void filterOffscreenItems(final @Nullable ItemFilter filter) {
         final ArrayList<ItemStack> result = new ArrayList<>();
         for (final ItemStack item : ItemList.items) {
             if (filter == null || filter.matches(item)) {
