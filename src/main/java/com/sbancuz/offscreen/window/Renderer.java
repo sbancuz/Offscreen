@@ -102,7 +102,7 @@ public final class Renderer {
         int err = GL11.glGetError();
         if (err != GL11.GL_NO_ERROR) {
             Offscreen.LOG.warn(
-                "[secondscreen] present blit GL error 0x{} fbo={} src={}x{} dst={}x{}",
+                "[Offscreen] present blit GL error 0x{} fbo={} src={}x{} dst={}x{}",
                 Integer.toHexString(err),
                 framebuffer,
                 bufferWidth,
@@ -164,7 +164,7 @@ public final class Renderer {
 
         final int status = GL30.glCheckFramebufferStatus(GL30.GL_FRAMEBUFFER);
         if (status != GL30.GL_FRAMEBUFFER_COMPLETE) {
-            Offscreen.LOG.error("[secondscreen] offscreen framebuffer incomplete: {}", status);
+            Offscreen.LOG.error("[Offscreen] offscreen framebuffer incomplete: {}", status);
             resetGLContext();
             return false;
         }

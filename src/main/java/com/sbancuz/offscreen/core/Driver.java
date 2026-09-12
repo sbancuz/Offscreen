@@ -6,12 +6,13 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
+import net.minecraft.client.Minecraft;
+
 import com.sbancuz.offscreen.window.Window;
 import com.sbancuz.offscreen.window.input.InputRouter;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
-import net.minecraft.client.Minecraft;
 
 public class Driver {
 

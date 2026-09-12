@@ -35,7 +35,7 @@ public final class ScreenScope implements Scope {
             try {
                 mc.setIngameFocus();
             } catch (final Throwable t) {
-                Offscreen.LOG.warn("[secondscreen] setIngameFocus restoration failed", t);
+                Offscreen.LOG.warn("[Offscreen] setIngameFocus restoration failed", t);
             }
         }
     }

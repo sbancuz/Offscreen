@@ -70,13 +70,13 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
                 action.accept(screen);
             } catch (final Throwable t) {
                 poisoned = true;
-                Offscreen.LOG.error("[secondscreen] scoped action failed", t);
+                Offscreen.LOG.error("[Offscreen] scoped action failed", t);
             } finally {
                 if (!poisoned) {
                     try {
                         handleScreenChange(savedScreen);
                     } catch (final Throwable t) {
-                        Offscreen.LOG.error("[secondscreen] screen-change handling failed", t);
+                        Offscreen.LOG.error("[Offscreen] screen-change handling failed", t);
                     }
                 }
                 MouseShadow.clear();
@@ -103,7 +103,7 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
         if (now == null) {
             if (size() > 1) {
                 final HostedScreen<?> t = pop();
-                Offscreen.LOG.info("[secondscreen] pop {} (close-to-null, depth {})", t, size());
+                Offscreen.LOG.info("[Offscreen] pop {} (close-to-null, depth {})", t, size());
                 t.dispose();
                 top().requestResize();
             }
@@ -115,10 +115,17 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
     }
 
     public void pushStolen(final GuiScreen stolen) {
+        if (stolen instanceof GuiContainer) {
+            Offscreen.LOG.warn(
+                "[Offscreen] inventory screens are not supported in offscreen windows: {}",
+                stolen.getClass()
+                    .getSimpleName());
+            return;
+        }
         final HostUI ui = UIRegistry.resolve(stolen);
         if (ui == null) {
             Offscreen.LOG.warn(
-                "[secondscreen] no UI factory for stolen screen: {}",
+                "[Offscreen] no UI factory for stolen screen: {}",
                 stolen.getClass()
                     .getSimpleName());
             return;
@@ -127,7 +134,7 @@ public class HostedStack extends ObjectArrayList<HostedScreen<?>> {
         entry.requestResize();
         push(entry);
         Offscreen.LOG.info(
-            "[secondscreen] STEAL {} (adapter: {}, depth {})",
+            "[Offscreen] STEAL {} (adapter: {}, depth {})",
             stolen.getClass()
                 .getSimpleName(),
             ui.getClass()

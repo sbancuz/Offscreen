@@ -48,14 +48,14 @@ public final class ScopePipeline implements Scope {
     private void unwind(final @Nullable Throwable enterFailureOrNull) {
         if (enterFailureOrNull != null) {
             Offscreen.LOG
-                .error("[secondscreen] scope enter() failed; unwinding already-entered scopes", enterFailureOrNull);
+                .error("[Offscreen] scope enter() failed; unwinding already-entered scopes", enterFailureOrNull);
         }
         for (int i = enteredCount - 1; i >= 0; i--) {
             try {
                 scopes[i].restore();
             } catch (final Throwable restoreFailure) {
                 Offscreen.LOG.error(
-                    "[secondscreen] scope restore() failed during unwind; continuing with the rest",
+                    "[Offscreen] scope restore() failed during unwind; continuing with the rest",
                     restoreFailure);
             }
         }

@@ -67,7 +67,7 @@ public class VanillaUI implements HostUI {
         try {
             acc.invokeMouseClicked(mouseX, mouseY, button);
         } catch (final Throwable t) {
-            Offscreen.LOG.trace("[secondscreen] mouseClicked failed", t);
+            Offscreen.LOG.trace("[Offscreen] mouseClicked failed", t);
         }
     }
 
@@ -88,19 +88,12 @@ public class VanillaUI implements HostUI {
         try {
             acc.invokeKeyTyped(typedChar, keyCode);
         } catch (final Throwable t) {
-            Offscreen.LOG.trace("[secondscreen] keyTyped failed", t);
+            Offscreen.LOG.trace("[Offscreen] keyTyped failed", t);
         }
     }
 
     @Override
-    public void onKeyReleased(char typedChar, int keyCode) {
-        // Vanilla screens generally ignore key releases (pre-wrapper MCHostUI did)
-    }
-
-    @Override
     public void onKeyPressed(KeyEvent key) {
-        // Override HostUI default that injects via lwjgl3ify – vanilla must NOT double-inject.
-        // Pre-wrapper vanilla only invoked keyTyped directly (or NEI via wrapper) without inject.
         if (key.pressed()) onKeyTyped(key.character(), key.keyCode());
         else onKeyReleased(key.character(), key.keyCode());
     }

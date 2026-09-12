@@ -45,7 +45,8 @@ public class TestMui2ScreenWithNEI extends ModularScreen {
             return panel;
         });
         var set = new UISettings();
-        set.getRecipeViewerSettings().enable();
+        set.getRecipeViewerSettings()
+            .enable();
 
         getContext().setSettings(set);
     }

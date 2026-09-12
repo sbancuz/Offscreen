@@ -68,7 +68,7 @@ public final class Window {
         this.title = title;
 
         if (!SDLInit.SDL_Init(SDLInit.SDL_INIT_VIDEO)) {
-            Offscreen.LOG.error("[secondscreen] SDL_Init failed: {}", sdlError());
+            Offscreen.LOG.error("[Offscreen] SDL_Init failed: {}", sdlError());
             return;
         }
 
@@ -76,7 +76,7 @@ public final class Window {
         try {
             if (!(Display.getDrawable() instanceof DrawableGL drawable)) {
                 Offscreen.LOG.error(
-                    "[secondscreen] unexpected drawable type {}",
+                    "[Offscreen] unexpected drawable type {}",
                     Display.getDrawable()
                         .getClass());
                 return;
@@ -96,14 +96,14 @@ public final class Window {
         restoreMcContext();
 
         if (sdlPtr == 0L) {
-            Offscreen.LOG.error("[secondscreen] SDL_CreateWindow failed: {}", sdlError());
+            Offscreen.LOG.error("[Offscreen] SDL_CreateWindow failed: {}", sdlError());
             return;
         }
 
         id = SDLVideo.SDL_GetWindowID(sdlPtr);
 
         if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext)) {
-            Offscreen.LOG.error("[secondscreen] SDL_GL_MakeCurrent failed: {}", sdlError());
+            Offscreen.LOG.error("[Offscreen] SDL_GL_MakeCurrent failed: {}", sdlError());
             return;
         }
         SDLVideo.SDL_GL_SetSwapInterval(0);
@@ -112,12 +112,12 @@ public final class Window {
         probeDrawableSize();
 
         if (!SDLVideo.SDL_ShowWindow(sdlPtr)) {
-            Offscreen.LOG.warn("[secondscreen] SDL_ShowWindow failed: {}", sdlError());
+            Offscreen.LOG.warn("[Offscreen] SDL_ShowWindow failed: {}", sdlError());
         }
         restoreMcContext();
 
         if (!SDLKeyboard.SDL_StartTextInput(sdlPtr)) {
-            Offscreen.LOG.warn("[secondscreen] SDL_StartTextInput failed: {}", sdlError());
+            Offscreen.LOG.warn("[Offscreen] SDL_StartTextInput failed: {}", sdlError());
         }
 
         Driver.INSTANCE.trackWindow(this);
@@ -195,7 +195,7 @@ public final class Window {
 
         if (renderer.fbo() != 0) {
             if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext)) {
-                Offscreen.LOG.error("[secondscreen] present MakeCurrent failed");
+                Offscreen.LOG.error("[Offscreen] present MakeCurrent failed");
                 Window.restoreMcContext();
                 return;
             }
@@ -203,7 +203,7 @@ public final class Window {
             renderer.present(pixelWidth, pixelHeight);
 
             if (!SDLVideo.SDL_GL_SwapWindow(sdlPtr)) {
-                Offscreen.LOG.warn("[secondscreen] SDL_GL_SwapWindow failed");
+                Offscreen.LOG.warn("[Offscreen] SDL_GL_SwapWindow failed");
             }
         }
     }
@@ -280,10 +280,12 @@ public final class Window {
                             c = (char) (sdlKeyCode & 0x1f);
                         }
                         // Debug aid for a->s shift: log mismatches between scancode-derived and keycode
-                        if (rawKeyCode != sdlKeyCode && rawKeyCode >= 32 && rawKeyCode <= 126
-                            && sdlKeyCode >= 32 && sdlKeyCode <= 126) {
+                        if (rawKeyCode != sdlKeyCode && rawKeyCode >= 32
+                            && rawKeyCode <= 126
+                            && sdlKeyCode >= 32
+                            && sdlKeyCode <= 126) {
                             Offscreen.LOG.debug(
-                                "[secondscreen] keycode mismatch scancode {} -> raw {} ('{}') vs sdlKey {} ('{}') lwjgl {}",
+                                "[Offscreen] keycode mismatch scancode {} -> raw {} ('{}') vs sdlKey {} ('{}') lwjgl {}",
                                 sdlScanCode,
                                 rawKeyCode,
                                 (char) rawKeyCode,

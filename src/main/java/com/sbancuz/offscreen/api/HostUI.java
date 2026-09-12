@@ -39,15 +39,18 @@ public interface HostUI {
             final int button = event.pressButton;
             event.pressButton = -1;
             onMouseClicked(event.mouseX, event.mouseY, button);
-            DragState.get(this).startDrag(button);
+            DragState.get(this)
+                .startDrag(button);
         }
         if (event.releaseButton != -1) {
             final int button = event.releaseButton;
             event.releaseButton = -1;
             onMouseReleased(event.mouseX, event.mouseY, button);
-            DragState.get(this).stopDrag(button);
+            DragState.get(this)
+                .stopDrag(button);
         }
-        if (DragState.get(this).isDragging()) {
+        if (DragState.get(this)
+            .isDragging()) {
             final DragState ds = DragState.get(this);
             onMouseDrag(event.mouseX, event.mouseY, ds.button, System.currentTimeMillis() - ds.startMs);
         }
@@ -94,8 +97,7 @@ public interface HostUI {
                 key.sdlKeyCode(),
                 key.sdlScanCode(),
                 0,
-                key.pressed()
-                    ? me.eigenraven.lwjgl3ify.api.InputEvents.KeyAction.PRESSED
+                key.pressed() ? me.eigenraven.lwjgl3ify.api.InputEvents.KeyAction.PRESSED
                     : me.eigenraven.lwjgl3ify.api.InputEvents.KeyAction.RELEASED,
                 (short) key.sdlMod(),
                 0L));
@@ -110,6 +112,7 @@ public interface HostUI {
     default void clearComponentFocus() {}
 
     final class DragState {
+
         private int button = -1;
         private long startMs;
 

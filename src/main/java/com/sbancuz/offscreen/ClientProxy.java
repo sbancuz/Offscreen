@@ -7,9 +7,6 @@ import net.minecraft.client.settings.KeyBinding;
 
 import org.lwjgl.input.Keyboard;
 
-import com.cleanroommc.modularui.screen.GuiContainerWrapper;
-import com.cleanroommc.modularui.screen.ModularContainer;
-import com.cleanroommc.modularui.screen.ModularScreen;
 import com.sbancuz.offscreen.api.OffscreenAPI;
 import com.sbancuz.offscreen.api.UIRegistry;
 import com.sbancuz.offscreen.core.Driver;
@@ -50,7 +47,7 @@ public class ClientProxy extends CommonProxy {
         ClientRegistry.registerKeyBinding(debugToggleScreen);
         ClientRegistry.registerKeyBinding(debugMui2NEI);
         ClientRegistry.registerKeyBinding(debugMui2NoNEI);
-//        ClientRegistry.registerKeyBinding(debugMui2NEIMain);
+        // ClientRegistry.registerKeyBinding(debugMui2NEIMain);
 
         FMLCommonHandler.instance()
             .bus()
@@ -73,10 +70,8 @@ public class ClientProxy extends CommonProxy {
         try {
             final Class<?> modularScreen = Class.forName("com.cleanroommc.modularui.screen.ModularScreen");
             UIRegistry.register(modularScreen, screen -> {
-                final com.cleanroommc.modularui.screen.ModularScreen ms =
-                    (com.cleanroommc.modularui.screen.ModularScreen) screen;
-                final com.sbancuz.offscreen.api.HostUI base =
-                    new com.sbancuz.offscreen.integration.mui2.Mui2UI(ms);
+                final com.cleanroommc.modularui.screen.ModularScreen ms = (com.cleanroommc.modularui.screen.ModularScreen) screen;
+                final com.sbancuz.offscreen.api.HostUI base = new com.sbancuz.offscreen.integration.mui2.Mui2UI(ms);
                 // Mui2UI is now pure (no NEI); wrap GuiContainers with NEI handling.
                 if (base.getGuiScreen() instanceof net.minecraft.client.gui.inventory.GuiContainer
                     && cpw.mods.fml.common.Loader.isModLoaded("NotEnoughItems")) {
@@ -107,13 +102,13 @@ public class ClientProxy extends CommonProxy {
             OffscreenAPI.open(com.sbancuz.offscreen.integration.mui2.TestMui2ScreenNoNEI::new);
         }
 
-//        if (debugMui2NEIMain.isPressed()) {
-//            Minecraft mc = Minecraft.getMinecraft();
-//            if (mc.theWorld == null || mc.thePlayer == null) return;
-//            ModularContainer container = new ModularContainer();
-//            container.constructClientOnly();
-//            ModularScreen screen = new com.sbancuz.offscreen.integration.mui2.TestMui2ScreenWithNEI();
-//            mc.displayGuiScreen(new GuiContainerWrapper(container, screen).getGuiScreen());
-//        }
+        // if (debugMui2NEIMain.isPressed()) {
+        // Minecraft mc = Minecraft.getMinecraft();
+        // if (mc.theWorld == null || mc.thePlayer == null) return;
+        // ModularContainer container = new ModularContainer();
+        // container.constructClientOnly();
+        // ModularScreen screen = new com.sbancuz.offscreen.integration.mui2.TestMui2ScreenWithNEI();
+        // mc.displayGuiScreen(new GuiContainerWrapper(container, screen).getGuiScreen());
+        // }
     }
 }

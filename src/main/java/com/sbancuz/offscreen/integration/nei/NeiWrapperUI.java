@@ -5,22 +5,19 @@ import java.util.Arrays;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import codechicken.nei.LayoutManager;
-import com.cleanroommc.modularui.core.mixins.early.minecraft.GuiContainerAccessor;
-import com.sbancuz.offscreen.scope.Scope;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainer;
-import net.minecraft.client.renderer.RenderHelper;
 
-import org.lwjgl.opengl.GL11;
 import org.lwjglx.input.KeyCodes;
 import org.lwjglx.input.Keyboard;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
+import com.sbancuz.offscreen.scope.Scope;
 import com.sbancuz.offscreen.window.input.KeyEvent;
 
+import codechicken.nei.LayoutManager;
 import codechicken.nei.guihook.GuiContainerManager;
 
 public final class NeiWrapperUI implements HostUI {
@@ -54,8 +51,7 @@ public final class NeiWrapperUI implements HostUI {
     }
 
     @Override
-    public void draw(final Minecraft mc, final int mouseX, final int mouseY, final float partialTicks,
-        final long now) {
+    public void draw(final Minecraft mc, final int mouseX, final int mouseY, final float partialTicks, final long now) {
         delegate.draw(mc, mouseX, mouseY, partialTicks, now);
     }
 
@@ -96,11 +92,9 @@ public final class NeiWrapperUI implements HostUI {
         if (withNeiBool(mgr -> {
             final int scrolled = scroll > 0 ? 120 : -120;
             final GuiContainer gc = (GuiContainer) delegate.getGuiScreen();
+            for (var h : GuiContainerManager.inputHandlers) h.onMouseScrolled(gc, mouseX, mouseY, scrolled);
             for (var h : GuiContainerManager.inputHandlers)
-                h.onMouseScrolled(gc, mouseX, mouseY, scrolled);
-            for (var h : GuiContainerManager.inputHandlers)
-                if (h.mouseScrolled((GuiContainer) delegate.getGuiScreen(), mouseX, mouseY, scrolled))
-                    return true;
+                if (h.mouseScrolled((GuiContainer) delegate.getGuiScreen(), mouseX, mouseY, scrolled)) return true;
             return false;
         })) return;
         delegate.onMouseScroll(mouseX, mouseY, scroll);
@@ -117,14 +111,19 @@ public final class NeiWrapperUI implements HostUI {
                     PRESERVED_KEYS[preservedCount++] = pending;
                 }
                 try {
-                    Keyboard.addRawKeyEvent(new Keyboard.KeyEvent(
-                        key.keyCode(), key.keyCode(), key.character(), Keyboard.KeyState.PRESS, System.nanoTime()));
+                    Keyboard.addRawKeyEvent(
+                        new Keyboard.KeyEvent(
+                            key.keyCode(),
+                            key.keyCode(),
+                            key.character(),
+                            Keyboard.KeyState.PRESS,
+                            System.nanoTime()));
                     final ByteBuffer keyArray = Keyboard.sdlKeyPressedArray;
-                    final int sdlScancode = key.sdlScanCode() != 0
-                        ? key.sdlScanCode()
+                    final int sdlScancode = key.sdlScanCode() != 0 ? key.sdlScanCode()
                         : KeyCodes.lwjglToSdlScancode(key.keyCode());
                     final byte prev = (keyArray != null && sdlScancode > 0 && sdlScancode < keyArray.limit())
-                        ? keyArray.get(sdlScancode) : 0;
+                        ? keyArray.get(sdlScancode)
+                        : 0;
                     if (keyArray != null && sdlScancode > 0 && sdlScancode < keyArray.limit())
                         keyArray.put(sdlScancode, (byte) 1);
                     try {
@@ -134,7 +133,9 @@ public final class NeiWrapperUI implements HostUI {
                             keyArray.put(sdlScancode, prev);
                     }
                 } finally {
-                    queue.addAll(Arrays.asList(PRESERVED_KEYS).subList(0, preservedCount));
+                    queue.addAll(
+                        Arrays.asList(PRESERVED_KEYS)
+                            .subList(0, preservedCount));
                     Arrays.fill(PRESERVED_KEYS, 0, preservedCount, null);
                 }
             });
@@ -160,7 +161,7 @@ public final class NeiWrapperUI implements HostUI {
         try {
             action.accept(mgr);
         } catch (Throwable t) {
-            Offscreen.LOG.warn("[secondscreen] NeiWrapper failed", t);
+            Offscreen.LOG.warn("[Offscreen] NeiWrapper failed", t);
         }
     }
 
@@ -172,7 +173,7 @@ public final class NeiWrapperUI implements HostUI {
         try {
             return action.apply(mgr);
         } catch (Throwable t) {
-            Offscreen.LOG.warn("[secondscreen] NeiWrapper failed", t);
+            Offscreen.LOG.warn("[Offscreen] NeiWrapper failed", t);
             return false;
         }
     }

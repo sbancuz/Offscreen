@@ -56,7 +56,8 @@ public class Mui2UI implements HostUI {
 
     @Override
     public void clearComponentFocus() {
-        screen.getContext().removeFocus();
+        screen.getContext()
+            .removeFocus();
     }
 
     @Override
