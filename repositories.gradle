@@ -1,5 +1,9 @@
 // Add any additional repositories for your dependencies here.
 
 repositories {
-
+    maven {
+        name = "Maven Central Snapshots"
+        url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+        content { includeGroup("org.lwjgl") }
+    }
 }

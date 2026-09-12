@@ -3,13 +3,12 @@ package com.sbancuz.offscreen.window;
 import java.nio.ByteBuffer;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
 
 import org.lwjgl.opengl.EXTFramebufferObject;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL30;
-import org.lwjgl.opengl.GL30C;
-import org.lwjgl.opengl.GL32C;
 
 import com.sbancuz.offscreen.Config;
 import com.sbancuz.offscreen.Offscreen;
@@ -17,6 +16,7 @@ import com.sbancuz.offscreen.Offscreen;
 public final class Renderer {
 
     private int targetFps = Config.focusedFps;
+    private int maxFps = Integer.MAX_VALUE;
     private int step = 1000 / targetFps;
     private long nextFrameMs = 0;
 
@@ -28,13 +28,12 @@ public final class Renderer {
     private int bufferHeight = -1;
 
     private int savedFbo;
-    private final float[] savedClear = new float[4];
-    private final ByteBuffer maskScratch = ByteBuffer.allocateDirect(4);
-
-    private boolean savedMaskR = true;
-    private boolean savedMaskG = true;
-    private boolean savedMaskB = true;
-    private boolean savedMaskA = true;
+    // Non-annotated on purpose: Angelica's redirector only matches org.lwjgl call sites (never
+    // org.lwjglx) and routes them to the active backend, so this class is emulated under SDL GPU
+    // and runs on real GL otherwise. @Lwjgl3Aware would leave these calls unrouted -> segfault.
+    // Note: only vanilla-common calls are used here. The 'v' state getters (glGetFloatv and
+    // glGetBooleanv) are deliberately avoided: after lwjgl3ify remaps them for the GL backend they
+    // don't exist in org.lwjglx and link fails. Background is painted instead of cleared.
 
     public boolean isTimeToRender() {
         final long now = System.currentTimeMillis();
@@ -44,7 +43,7 @@ public final class Renderer {
     }
 
     public void setFocused(boolean focused) {
-        final int newFps = focused ? Config.focusedFps : Config.unfocusedFps;
+        final int newFps = Math.min(focused ? Config.focusedFps : Config.unfocusedFps, maxFps);
         if (targetFps != newFps) {
             targetFps = newFps;
             step = 1000 / targetFps;
@@ -52,24 +51,19 @@ public final class Renderer {
         }
     }
 
+    public void setMaxFps(final int maxFps) {
+        this.maxFps = Math.max(maxFps, 1);
+    }
+
     public void beginFrame(final int width, final int height, final int guiWidth, final int guiHeight) {
         savedFbo = GL11.glGetInteger(EXTFramebufferObject.GL_FRAMEBUFFER_BINDING_EXT);
-        GL11.glGetFloatv(GL11.GL_COLOR_CLEAR_VALUE, savedClear);
-        maskScratch.clear();
-        GL11.glGetBooleanv(GL11.GL_COLOR_WRITEMASK, maskScratch);
-        savedMaskR = maskScratch.get(0) != 0;
-        savedMaskG = maskScratch.get(1) != 0;
-        savedMaskB = maskScratch.get(2) != 0;
-        savedMaskA = maskScratch.get(3) != 0;
 
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, framebuffer);
         GL11.glViewport(0, 0, width, height);
-        GL11.glClearColor(0.08f, 0.09f, 0.11f, 1f);
-        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_STENCIL_BUFFER_BIT);
+        // Depth/stencil only: color is painted below, so the ambient clear color is never touched
+        // and never needs saving.
+        GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_STENCIL_BUFFER_BIT);
 
-        GL11.glColorMask(true, true, true, false);
-
-        GL11.glDisable(GL11.GL_BLEND);
         GL11.glDisable(GL11.GL_LIGHTING);
         GL11.glEnable(GL11.GL_TEXTURE_2D);
         GL11.glColor4f(1f, 1f, 1f, 1f);
@@ -81,43 +75,50 @@ public final class Renderer {
         GL11.glLoadIdentity();
 
         GL11.glTranslatef(0f, 0f, -2000f);
+
+        // Opaque background via vanilla drawing (balanced GL state). The ambient color mask is
+        // left alone, so nothing needs restoring in endFrame.
+        Gui.drawRect(0, 0, guiWidth, guiHeight, 0xFF14171C);
+
+        GL11.glDisable(GL11.GL_BLEND);
+        GL11.glDisable(GL11.GL_LIGHTING);
+        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        GL11.glColor4f(1f, 1f, 1f, 1f);
     }
 
     public void endFrame(final Minecraft mc) {
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, savedFbo);
         GL11.glViewport(0, 0, mc.displayWidth, mc.displayHeight);
-        GL11.glColorMask(savedMaskR, savedMaskG, savedMaskB, savedMaskA);
-        GL11.glClearColor(savedClear[0], savedClear[1], savedClear[2], savedClear[3]);
         mc.entityRenderer.setupOverlayRendering();
     }
 
-    public void present(int pixelWidth, int pixelHeight) {
-        GL30C.glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, framebuffer);
-        GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, 0);
-        final int dw = Math.max(pixelWidth, 1);
-        final int dh = Math.max(pixelHeight, 1);
-        GL11.glViewport(0, 0, dw, dh);
-        GL32C
-            .glBlitFramebuffer(0, 0, bufferWidth, bufferHeight, 0, 0, dw, dh, GL11.GL_COLOR_BUFFER_BIT, GL11.GL_LINEAR);
-        int err = GL11.glGetError();
-        if (err != GL11.GL_NO_ERROR) {
-            Offscreen.LOG.warn(
-                "[Offscreen] present blit GL error 0x{} fbo={} src={}x{} dst={}x{}",
-                Integer.toHexString(err),
-                framebuffer,
-                bufferWidth,
-                bufferHeight,
-                dw,
-                dh);
-            GL11.glClearColor(1f, 0f, 1f, 1f);
-            GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
-        }
-        GL30C.glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, 0);
-        GL11.glFlush();
+    /**
+     * Read the offscreen color buffer. Rebinds our framebuffer first: drawing code is free to leave
+     * any binding behind, so reading the ambient binding would return the wrong buffer. Call after
+     * drawing and before {@link #endFrame(Minecraft)} (which restores the saved binding); the caller
+     * rewinds {@code dst} before uploading.
+     *
+     * @param glFormat {@code GL_BGRA} for B8G8R8A8 swapchains, {@code GL_RGBA} otherwise.
+     */
+    public void readback(final ByteBuffer dst, final int width, final int height, final int glFormat) {
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, framebuffer);
+        GL11.glReadPixels(0, 0, width, height, glFormat, GL11.GL_UNSIGNED_BYTE, dst);
     }
 
     public int fbo() {
         return framebuffer;
+    }
+
+    public int colorTexture() {
+        return colorTexture;
+    }
+
+    public int bufferWidth() {
+        return bufferWidth;
+    }
+
+    public int bufferHeight() {
+        return bufferHeight;
     }
 
     public boolean ensureCorrectSize(int width, int height) {

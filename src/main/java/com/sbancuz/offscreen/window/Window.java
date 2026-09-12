@@ -8,8 +8,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 
 import org.lwjgl.opengl.GL;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
 import org.lwjgl.sdl.SDLError;
 import org.lwjgl.sdl.SDLEvents;
+import org.lwjgl.sdl.SDLGPU;
 import org.lwjgl.sdl.SDLInit;
 import org.lwjgl.sdl.SDLKeyboard;
 import org.lwjgl.sdl.SDLKeycode;
@@ -19,7 +22,6 @@ import org.lwjgl.sdl.SDL_Event;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjglx.input.KeyCodes;
 import org.lwjglx.opengl.Display;
-import org.lwjglx.opengl.DrawableGL;
 
 import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.api.HostUI;
@@ -27,21 +29,36 @@ import com.sbancuz.offscreen.core.Driver;
 import com.sbancuz.offscreen.mixins.MinecraftAccessor;
 import com.sbancuz.offscreen.window.input.FrameEvent;
 import com.sbancuz.offscreen.window.input.InputRouter;
+import com.sbancuz.offscreen.window.sdlgpu.SdlGpuBackend;
+import com.sbancuz.offscreen.window.sdlgpu.SdlGpuDevice;
+import com.sbancuz.offscreen.window.sdlgpu.SdlGpuPresenter;
+import com.sbancuz.offscreen.window.sdlgpu.SdlGpuUpload;
 
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
+import me.eigenraven.lwjgl3ify.api.Lwjgl3Aware;
 
+@Lwjgl3Aware
 public final class Window {
 
     public static final int DEFAULT_WIDTH = 1280;
     public static final int DEFAULT_HEIGHT = 800;
     private static final int RING_CAPACITY = 256;
+    /**
+     * Present cap while readbacks go through backend emulation: every emulated readback forces a
+     * mid-frame submit plus a full GPU drain on the client thread, racing the backend's own
+     * presenter thread. Does not apply to borrowed-device blits, which submit no extra work that
+     * needs draining.
+     */
+    private static final int EMULATED_BACKEND_MAX_FPS = 20;
 
     @Getter
     private volatile int id;
     private long sdlPtr;
-    private long sharedContext;
+    private long device;
+    private boolean borrowedDevice;
+    private final SdlGpuUpload upload = new SdlGpuUpload();
 
     @Getter
     private final String title;
@@ -72,42 +89,43 @@ public final class Window {
             return;
         }
 
-        Display.glContextMutex.lock();
-        try {
-            if (!(Display.getDrawable() instanceof DrawableGL drawable)) {
-                Offscreen.LOG.error(
-                    "[Offscreen] unexpected drawable type {}",
-                    Display.getDrawable()
-                        .getClass());
+        device = SdlGpuBackend.angelicaDevice();
+        if (device != 0L) {
+            // Borrow Angelica's device: our emulated textures live on it, so direct blits stay
+            // same-device (cross-device submission hangs the GPU). Never destroy it; only claim
+            // and release our own window. Angelica's bookkeeping tracks just the main window, so
+            // a raw claim here disturbs nothing of theirs.
+            borrowedDevice = true;
+        } else {
+            device = SdlGpuDevice.acquire();
+            if (device == 0L) {
+                Offscreen.LOG.error("[Offscreen] no usable SDL GPU device, cannot open '{}'", title);
                 return;
             }
-            sharedContext = drawable.createSharedContext().sdlContext;
-        } finally {
-            Display.glContextMutex.unlock();
         }
 
-        restoreMcContext();
-
+        // Plain window: no SDL_WINDOW_OPENGL, no shared GL context. Presentation always goes
+        // through our own SDL GPU command buffers, whatever backend the main window uses.
         sdlPtr = SDLVideo.SDL_CreateWindow(
             title,
             DEFAULT_WIDTH,
             DEFAULT_HEIGHT,
-            SDLVideo.SDL_WINDOW_OPENGL | SDLVideo.SDL_WINDOW_RESIZABLE | SDLVideo.SDL_WINDOW_HIDDEN);
-        restoreMcContext();
-
+            SDLVideo.SDL_WINDOW_RESIZABLE | SDLVideo.SDL_WINDOW_HIDDEN);
         if (sdlPtr == 0L) {
             Offscreen.LOG.error("[Offscreen] SDL_CreateWindow failed: {}", sdlError());
+            releaseDevice();
             return;
         }
 
         id = SDLVideo.SDL_GetWindowID(sdlPtr);
 
-        if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext)) {
-            Offscreen.LOG.error("[Offscreen] SDL_GL_MakeCurrent failed: {}", sdlError());
+        if (!SDLGPU.SDL_ClaimWindowForGPUDevice(device, sdlPtr)) {
+            Offscreen.LOG.error("[Offscreen] SDL_ClaimWindowForGPUDevice failed: {}", sdlError());
+            SDLVideo.SDL_DestroyWindow(sdlPtr);
+            sdlPtr = 0L;
+            releaseDevice();
             return;
         }
-        SDLVideo.SDL_GL_SetSwapInterval(0);
-        restoreMcContext();
 
         probeDrawableSize();
 
@@ -120,7 +138,23 @@ public final class Window {
             Offscreen.LOG.warn("[Offscreen] SDL_StartTextInput failed: {}", sdlError());
         }
 
+        Offscreen.LOG.info(
+            "[Offscreen] opened '{}' via SDLGPU ({}x{}, swapchain format {}, device {})",
+            title,
+            pixelWidth,
+            pixelHeight,
+            SdlGpuPresenter.swapchainFormat(device, sdlPtr),
+            borrowedDevice ? "borrowed" : "owned");
+
         Driver.INSTANCE.trackWindow(this);
+    }
+
+    private void releaseDevice() {
+        if (!borrowedDevice) {
+            SdlGpuDevice.release(device);
+        }
+        device = 0L;
+        borrowedDevice = false;
     }
 
     public boolean isOpen() {
@@ -130,10 +164,15 @@ public final class Window {
     public void destroy() {
         if (sdlPtr == 0L) return;
         SDLKeyboard.SDL_StopTextInput(sdlPtr);
+        if (device != 0L) {
+            SDLGPU.SDL_ReleaseWindowFromGPUDevice(device, sdlPtr);
+        }
         SDLVideo.SDL_DestroyWindow(sdlPtr);
         sdlPtr = 0L;
+        upload.destroy(device);
+        upload.freePixels();
+        releaseDevice();
         freeRing();
-        restoreMcContext();
         Driver.INSTANCE.removeWindow(this);
     }
 
@@ -143,6 +182,9 @@ public final class Window {
 
     @SneakyThrows
     static void restoreMcContext() {
+        // Under the SDL GPU backend the main window owns no GL context; there is nothing to
+        // restore and creating capabilities without a context would be wrong.
+        if (!Display.hasGLContext()) return;
         Display.getDrawable()
             .makeCurrent();
         GL.createCapabilities();
@@ -150,6 +192,9 @@ public final class Window {
 
     public void tryRenderFrame() {
         if (!isOpen()) return;
+        // Borrowed-device blits submit no drain-inducing work, so only the owned-device upload
+        // path on an emulated backend is capped.
+        renderer.setMaxFps(borrowedDevice || Display.hasGLContext() ? Integer.MAX_VALUE : EMULATED_BACKEND_MAX_FPS);
         renderer.setFocused(focusState);
         if (!renderer.isTimeToRender()) return;
 
@@ -177,7 +222,12 @@ public final class Window {
             return;
         }
 
+        final int srcWidth = renderer.bufferWidth();
+        final int srcHeight = renderer.bufferHeight();
+
         renderer.beginFrame(pixelWidth, pixelHeight, guiWidth, guiHeight);
+        long blitTexture = 0L;
+        ByteBuffer pixels = null;
         try {
             final long now = System.currentTimeMillis();
             final float partialTicks = ((MinecraftAccessor) mc).getTimer().renderPartialTicks;
@@ -189,22 +239,43 @@ public final class Window {
                 s.dispatchInput(frameEvent, partialTicks);
                 s.draw(mc, frameEvent.mouseX, frameEvent.mouseY, partialTicks, now);
             });
+
+            if (borrowedDevice) {
+                // Same-device direct blit: our emulated FBO texture already lives on Angelica's
+                // device, so presenting it needs no readback, no transfer and no fence-wait.
+                // Content trails the recording by one submit (it executes with the main frame),
+                // which is invisible at UI rates. Falls back to the upload path below when the
+                // texture is unknown or not blit-source-capable.
+                final int colorTex = renderer.colorTexture();
+                final long gpuTex = SdlGpuBackend.gpuTexture(colorTex);
+                if (gpuTex != 0L && SdlGpuBackend.isSampleable(colorTex)) {
+                    blitTexture = gpuTex;
+                }
+            }
+            if (blitTexture == 0L) {
+                // Portable path, always same-device: read the FBO back while it is still bound,
+                // then stage it through a transfer buffer owned by whichever device we present on.
+                final int swapFormat = SdlGpuPresenter.swapchainFormat(device, sdlPtr);
+                if (upload.ensure(device, srcWidth, srcHeight, swapFormat)) {
+                    final int glFormat = SdlGpuPresenter.isBgrFormat(swapFormat) ? GL12.GL_BGRA : GL11.GL_RGBA;
+                    pixels = upload.pixels(srcWidth, srcHeight);
+                    renderer.readback(pixels, srcWidth, srcHeight, glFormat);
+                    pixels.rewind();
+                } else {
+                    pixels = null;
+                    Offscreen.LOG.warn("[Offscreen] SDLGPU upload surface unavailable, dropping frame: {}", sdlError());
+                }
+            }
         } finally {
             renderer.endFrame(mc);
         }
 
-        if (renderer.fbo() != 0) {
-            if (!SDLVideo.SDL_GL_MakeCurrent(sdlPtr, sharedContext)) {
-                Offscreen.LOG.error("[Offscreen] present MakeCurrent failed");
-                Window.restoreMcContext();
-                return;
-            }
-
-            renderer.present(pixelWidth, pixelHeight);
-
-            if (!SDLVideo.SDL_GL_SwapWindow(sdlPtr)) {
-                Offscreen.LOG.warn("[Offscreen] SDL_GL_SwapWindow failed");
-            }
+        if (renderer.fbo() == 0) return;
+        if (blitTexture != 0L) {
+            SdlGpuPresenter.present(device, sdlPtr, blitTexture, srcWidth, srcHeight, SdlGpuPresenter.FLIP_NONE);
+        } else if (pixels != null) {
+            SdlGpuPresenter
+                .presentPixels(device, sdlPtr, upload, pixels, srcWidth, srcHeight, SdlGpuPresenter.FLIP_VERTICAL);
         }
     }
 

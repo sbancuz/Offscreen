@@ -8,6 +8,7 @@ import java.util.function.Predicate;
 
 import net.minecraft.client.Minecraft;
 
+import com.sbancuz.offscreen.Offscreen;
 import com.sbancuz.offscreen.window.Window;
 import com.sbancuz.offscreen.window.input.InputRouter;
 
@@ -25,7 +26,17 @@ public class Driver {
     public void onRenderTick(final TickEvent.RenderTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         for (final Window w : windows.values()) {
-            w.tryRenderFrame();
+            // A failing second window must never take down the game loop: close it instead.
+            // Note this cannot save a run where the underlying GPU device is truly lost; it only
+            // stops OUR stack from being the propagation vector for recoverable failures.
+            try {
+                w.tryRenderFrame();
+            } catch (final Throwable t) {
+                Offscreen.LOG.error("[Offscreen] window '{}' failed, closing it", w.getTitle(), t);
+                try {
+                    w.destroy();
+                } catch (final Throwable ignored) {}
+            }
         }
     }
 
@@ -37,7 +48,14 @@ public class Driver {
             return;
         }
         for (final Window w : windows.values()) {
-            w.update();
+            try {
+                w.update();
+            } catch (final Throwable t) {
+                Offscreen.LOG.error("[Offscreen] window '{}' update failed, closing it", w.getTitle(), t);
+                try {
+                    w.destroy();
+                } catch (final Throwable ignored) {}
+            }
         }
     }
 
