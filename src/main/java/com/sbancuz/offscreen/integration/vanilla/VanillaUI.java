@@ -37,6 +37,7 @@ public class VanillaUI implements HostUI {
 
     }
 
+    @Override
     public void update() {
         if (screen.width <= 0) return;
         screen.updateScreen();

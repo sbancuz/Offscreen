@@ -45,6 +45,13 @@ public class Mui2UI implements HostUI {
     }
 
     @Override
+    public void update() {
+        screen.getContext()
+            .tick();
+        screen.onUpdate();
+    }
+
+    @Override
     public void dispose() {
 
     }
